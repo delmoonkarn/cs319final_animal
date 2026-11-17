@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { animalRouter } from "./animal.routes";
 import { authRouter } from "./auth.routes";
 import { uploadRouter } from "./upload.routes";
 
@@ -11,3 +12,4 @@ apiRouter.get("/health", (_req, res) => {
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/uploads", uploadRouter);
+apiRouter.use("/animals", animalRouter);

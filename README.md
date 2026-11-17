@@ -150,6 +150,69 @@ const thumb = (url: string) => (url.endsWith(".webp") ? url.replace(/\.webp$/, "
 Typical flow: upload images first → send the returned `url`s in the create request
 (animal, report, update or donation slip).
 
+### Animals
+
+| Method | Path | Auth | Response |
+| --- | --- | --- | --- |
+| GET | `/animals` | – | `200 { data: AnimalListItem[], pagination }` |
+| GET | `/animals/:id` | – | `200 AnimalDetail` |
+| POST | `/animals` | admin | `201 AnimalDetail` |
+| PATCH | `/animals/:id` | admin | `200 AnimalDetail` |
+| DELETE | `/animals/:id` | admin | `204` (no body) |
+
+**List query parameters** (all optional):
+
+| Param | Values | Default |
+| --- | --- | --- |
+| `species` | `DOG` / `CAT` / `OTHER` | – |
+| `status` | `AVAILABLE` / `PENDING` / `ADOPTED` | – |
+| `gender` | `MALE` / `FEMALE` / `UNKNOWN` | – |
+| `isUrgent`, `isVaccinated` | `true` / `false` | – |
+| `q` | search text (name, breed, location) | – |
+| `sort` | `newest` / `oldest` / `urgent` / `name` | `newest` |
+| `page`, `pageSize` | numbers (`pageSize` max 50) | `1`, `12` |
+
+Example: `GET /animals?species=CAT&isUrgent=true&q=บางนา&page=1&pageSize=12`
+
+```jsonc
+// AnimalListItem (cards)
+{ "id": 3, "name": "โมจิ", "species": "DOG", "breed": "ปอมเมอเรเนียนผสม", "gender": "FEMALE",
+  "ageMonths": 24, "isVaccinated": true, "isUrgent": false, "status": "PENDING",
+  "locationFound": "…", "adoptedAt": null, "createdAt": "2026-…",
+  "coverImage": { "url": "…", "thumbUrl": "…" } }
+
+// pagination
+{ "page": 1, "pageSize": 12, "total": 42, "totalPages": 4 }
+
+// AnimalDetail = every animal field (incl. personality, healthNote, updatedAt) plus:
+{ "images": [{ "url": "…", "thumbUrl": "…" }],            // first = cover
+  "favoriteCount": 1,
+  "updates": [{ "id": 1, "caption": "…", "createdAt": "…",  // success stories, oldest first
+                "images": [{ "url": "…", "thumbUrl": "…" }],
+                "author": { "id": 1, "name": "…", "role": "ADMIN" } }] }
+```
+
+**Create body** (PATCH takes any subset of the same fields):
+
+```json
+{
+  "name": "มะม่วง", "species": "CAT", "breed": "แมวไทยพันทาง", "gender": "FEMALE",
+  "ageMonths": 7, "personality": "ขี้เล่น", "healthNote": "ทำหมันแล้ว",
+  "isVaccinated": true, "isUrgent": false,
+  "imageUrls": ["<url from POST /uploads>", "…"],
+  "locationFound": "ซอยอารีย์ เขตพญาไท"
+}
+```
+
+- `imageUrls`: 1–5 URLs from `POST /uploads`, first one = cover. `isVaccinated` / `isUrgent` default to `false`.
+- `status` and `adoptedAt` can't be set here: new animals start `AVAILABLE`, and adoption requests
+  move them to `PENDING` / `ADOPTED`.
+- PATCH with a new `imageUrls` list deletes the photos you removed from Storage.
+- DELETE also removes the animal's adoption requests, favorites, success stories and all their
+  photos. A report it was created from is kept (unlinked).
+- Animal responses already include `thumbUrl` for every image.
+- Response types: `server/src/lib/animal-dto.ts` and `server/src/types/api.ts`.
+
 ### Health
 
 `GET /health` → `{ "status": "ok", "time": "…" }`
