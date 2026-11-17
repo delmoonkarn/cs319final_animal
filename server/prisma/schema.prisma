@@ -1,0 +1,218 @@
+// Community stray-animal adoption app — database schema (Prisma 7)
+// Apply changes with Prisma Migrate: `npm run db:migrate -- --name <change>`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Connection strings are not set here in Prisma 7:
+// - Prisma Migrate uses DIRECT_URL, configured in prisma.config.ts
+// - the server uses DATABASE_URL through the pg driver adapter in src/lib/prisma.ts
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Species {
+  DOG
+  CAT
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum AnimalStatus {
+  AVAILABLE
+  PENDING
+  ADOPTED
+}
+
+enum HousingType {
+  HOUSE
+  CONDO
+  DORM
+}
+
+/// Review state shared by adoption requests and community reports
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DonationStatus {
+  PENDING
+  CONFIRMED
+}
+
+// ─────────────────────────── Models ───────────────────────────
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  phone        String
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+
+  adoptionRequests AdoptionRequest[]
+  favorites        Favorite[]
+  donations        Donation[]
+  /// Found/injured animal reports this user submitted
+  reports          Report[]          @relation("UserReports")
+  /// Success-story updates this user wrote (admin or adopter)
+  authoredUpdates  AnimalUpdate[]    @relation("AuthoredUpdates")
+}
+
+model Animal {
+  id            Int          @id @default(autoincrement())
+  name          String
+  species       Species
+  breed         String
+  gender        Gender
+  ageMonths     Int
+  personality   String
+  healthNote    String
+  isVaccinated  Boolean      @default(false)
+  isUrgent      Boolean      @default(false)
+  /// 1–5 full-size image URLs; the first one is the cover photo (count enforced by zod)
+  imageUrls     String[]
+  locationFound String
+  status        AnimalStatus @default(AVAILABLE)
+  adoptedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  adoptionRequests AdoptionRequest[]
+  favorites        Favorite[]
+  updates          AnimalUpdate[]
+  /// The community report this animal was created from, if any
+  report           Report?
+
+  @@index([status])
+  @@index([species])
+  @@index([isUrgent])
+}
+
+model AdoptionRequest {
+  id          Int          @id @default(autoincrement())
+  userId      Int
+  animalId    Int
+  reason      String
+  housingType HousingType
+  status      ReviewStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  /// A user can request the same animal only once
+  @@unique([userId, animalId])
+  @@index([animalId])
+}
+
+/// Wishlist entry
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  animalId  Int
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animalId])
+  @@index([animalId])
+}
+
+/// Success-story timeline entry for an adopted animal
+model AnimalUpdate {
+  id        Int      @id @default(autoincrement())
+  animalId  Int
+  authorId  Int
+  /// 1–4 image URLs (count enforced by zod)
+  imageUrls String[]
+  caption   String
+  createdAt DateTime @default(now())
+
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  author User   @relation("AuthoredUpdates", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([animalId])
+  @@index([authorId])
+}
+
+/// Community report of a found or injured animal
+model Report {
+  id          Int          @id @default(autoincrement())
+  userId      Int
+  species     Species
+  breed       String?
+  /// 1–3 image URLs (count enforced by zod)
+  imageUrls   String[]
+  location    String
+  description String
+  status      ReviewStatus @default(PENDING)
+  /// Set when an approved report is turned into an Animal listing
+  animalId    Int?         @unique
+  createdAt   DateTime     @default(now())
+
+  reporter User    @relation("UserReports", fields: [userId], references: [id], onDelete: Cascade)
+  animal   Animal? @relation(fields: [animalId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model DonationPackage {
+  id          Int    @id @default(autoincrement())
+  name        String
+  description String
+  /// Price in THB
+  price       Int
+  icon        String
+
+  items DonationItem[]
+}
+
+model Donation {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  /// Sum of quantity * unitPrice over all items, in THB
+  total     Int
+  slipUrl   String
+  status    DonationStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items DonationItem[]
+
+  @@index([userId])
+}
+
+/// One line of a donation "receipt"
+model DonationItem {
+  id         Int @id @default(autoincrement())
+  donationId Int
+  packageId  Int
+  quantity   Int
+  /// Package price copied at checkout, in THB
+  unitPrice  Int
+
+  donation Donation        @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  package  DonationPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@unique([donationId, packageId])
+  @@index([packageId])
+}

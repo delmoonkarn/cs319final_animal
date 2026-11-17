@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment files (secrets) — only the example is committed
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local tool files
+.claude/
+CLAUDE.md
