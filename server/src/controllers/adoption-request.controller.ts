@@ -7,6 +7,7 @@ import {
   toMyAdoptionRequest,
   type AdminAdoptionRequest,
 } from "../lib/adoption-request-dto";
+import { TRANSACTION_OPTIONS, lockAnimal, rejectPendingRequests } from "../lib/animal-status";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
 import { getAuthUser } from "../middlewares/auth";
@@ -20,34 +21,17 @@ import {
 import { idParamSchema } from "../validators/common";
 
 /*
- * Status rules (animal ← requests):
- *   first request on an AVAILABLE animal      → animal PENDING
- *   request approved                          → request APPROVED, animal ADOPTED (+ adoptedAt),
- *                                               every other PENDING request for it → REJECTED
- *   request rejected / cancelled, none left   → animal back to AVAILABLE
+ * Status rules: only requests are PENDING. The animal stays AVAILABLE (anyone can still apply)
+ * until a request is approved:
+ *   request approved             → request APPROVED, animal ADOPTED (+ adoptedAt, no longer urgent),
+ *                                  every other PENDING request for it → REJECTED
+ *   request rejected / cancelled → the animal doesn't change
+ *   rejected user applies again  → the same request goes back to PENDING (new reason, new date)
  *
  * Every change runs in a transaction that first locks the animal's row, so two changes for the
  * same animal (e.g. two admins approving different requests at once) happen one after the other.
+ * (Helpers in lib/animal-status.ts, shared with the admin status override on animals.)
  */
-
-const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
-
-/** Locks the animal row until the transaction ends. Returns false if the animal doesn't exist. */
-async function lockAnimal(tx: Prisma.TransactionClient, animalId: number): Promise<boolean> {
-  const { count } = await tx.animal.updateMany({ where: { id: animalId }, data: { updatedAt: new Date() } });
-  return count === 1;
-}
-
-/** Puts a PENDING animal back to AVAILABLE when it has no pending requests left. */
-async function releaseAnimalIfNoPending(tx: Prisma.TransactionClient, animalId: number): Promise<void> {
-  const pending = await tx.adoptionRequest.count({ where: { animalId, status: ReviewStatus.PENDING } });
-  if (pending === 0) {
-    await tx.animal.updateMany({
-      where: { id: animalId, status: AnimalStatus.PENDING },
-      data: { status: AnimalStatus.AVAILABLE },
-    });
-  }
-}
 
 /** POST /api/adoption-requests (users) */
 export async function createAdoptionRequest(req: Request, res: Response): Promise<void> {
@@ -68,24 +52,20 @@ export async function createAdoptionRequest(req: Request, res: Response): Promis
 
     const existing = await tx.adoptionRequest.findUnique({
       where: { userId_animalId: { userId: user.id, animalId } },
-      select: { status: true },
+      select: { id: true, status: true },
     });
-    if (existing) {
-      throw new HttpError(
-        409,
-        existing.status === ReviewStatus.REJECTED
-          ? "Your earlier request for this animal was rejected"
-          : "You have already sent a request for this animal",
-      );
+    if (existing && existing.status !== ReviewStatus.REJECTED) {
+      throw new HttpError(409, "You have already sent a request for this animal");
     }
 
-    if (animal.status === AnimalStatus.AVAILABLE) {
-      await tx.animal.update({ where: { id: animalId }, data: { status: AnimalStatus.PENDING } });
-    }
-    return tx.adoptionRequest.create({
-      data: { userId: user.id, animalId, reason, housingType },
-      select: myAdoptionRequestSelect,
-    });
+    // One request per user and animal: after a rejection, applying again reuses that request.
+    const data = { reason, housingType, status: ReviewStatus.PENDING, createdAt: new Date() };
+    return existing
+      ? tx.adoptionRequest.update({ where: { id: existing.id }, data, select: myAdoptionRequestSelect })
+      : tx.adoptionRequest.create({
+          data: { ...data, userId: user.id, animalId },
+          select: myAdoptionRequestSelect,
+        });
   }, TRANSACTION_OPTIONS);
 
   res.status(201).json(toMyAdoptionRequest(request));
@@ -126,7 +106,6 @@ export async function cancelAdoptionRequest(req: Request, res: Response): Promis
     if (count === 0) {
       throw new HttpError(409, "Only pending requests can be cancelled");
     }
-    await releaseAnimalIfNoPending(tx, request.animalId);
   }, TRANSACTION_OPTIONS);
 
   res.status(204).end();
@@ -189,17 +168,13 @@ export async function reviewAdoptionRequest(req: Request, res: Response): Promis
         throw new HttpError(409, "This animal has already been adopted");
       }
       await tx.adoptionRequest.update({ where: { id }, data: { status } });
-      await tx.adoptionRequest.updateMany({
-        where: { animalId, status: ReviewStatus.PENDING },
-        data: { status: ReviewStatus.REJECTED },
-      });
+      await rejectPendingRequests(tx, animalId);
       await tx.animal.update({
         where: { id: animalId },
-        data: { status: AnimalStatus.ADOPTED, adoptedAt: new Date() },
+        data: { status: AnimalStatus.ADOPTED, adoptedAt: new Date(), isUrgent: false },
       });
     } else {
       await tx.adoptionRequest.update({ where: { id }, data: { status } });
-      await releaseAnimalIfNoPending(tx, animalId);
     }
 
     return tx.adoptionRequest.findUniqueOrThrow({ where: { id }, select: adminAdoptionRequestSelect });

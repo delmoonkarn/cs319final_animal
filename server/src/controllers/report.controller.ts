@@ -9,7 +9,7 @@ import {
   toMyReport,
   type AdminReport,
 } from "../lib/report-dto";
-import { deleteImages } from "../lib/storage";
+import { deleteUnusedImages } from "../lib/image-cleanup";
 import { getAuthUser } from "../middlewares/auth";
 import type { Paginated } from "../types/api";
 import { idParamSchema } from "../validators/common";
@@ -115,7 +115,7 @@ export async function reviewReport(req: Request, res: Response): Promise<void> {
     if (count === 0) {
       throw alreadyReviewed();
     }
-    await deleteImages(report.imageUrls);
+    await deleteUnusedImages(report.imageUrls);
   } else {
     const details = decision.animal;
     const breed = details.breed ?? report.breed;
@@ -144,11 +144,14 @@ export async function reviewReport(req: Request, res: Response): Promise<void> {
           gender: details.gender,
           ageMonths: details.ageMonths,
           personality: details.personality,
+          description: details.description,
           healthNote: details.healthNote,
           isVaccinated: details.isVaccinated,
+          isSterilized: details.isSterilized,
           isUrgent: details.isUrgent,
           imageUrls,
           locationFound: details.locationFound ?? report.location,
+          province: details.province,
         },
         select: { id: true },
       });
@@ -170,7 +173,7 @@ export async function deleteReport(req: Request, res: Response): Promise<void> {
 
   const report = await prisma.report.findUnique({
     where: { id },
-    select: { userId: true, imageUrls: true, animal: { select: { imageUrls: true } } },
+    select: { userId: true, imageUrls: true },
   });
   if (!report) {
     throw new HttpError(404, "Report not found");
@@ -190,7 +193,7 @@ export async function deleteReport(req: Request, res: Response): Promise<void> {
     }
   }
 
-  const usedByAnimal = new Set(report.animal?.imageUrls ?? []);
-  await deleteImages(report.imageUrls.filter((url) => !usedByAnimal.has(url)));
+  // Photos the animal created from this report still shows are kept.
+  await deleteUnusedImages(report.imageUrls);
   res.status(204).end();
 }

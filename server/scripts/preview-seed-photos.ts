@@ -27,8 +27,8 @@ function card(animal: AnimalSeed): string {
     <article>
       <h3>${escape(animal.name)} <small>${escape(animal.key)}</small></h3>
       <p class="breed">${escape(animal.breed)}</p>
-      <p class="meta">${animal.gender} · ${animal.ageMonths} months · ${animal.status}${animal.isUrgent ? " · URGENT" : ""}</p>
-      <p class="desc">${escape(animal.personality)}<br>${escape(animal.healthNote)}</p>
+      <p class="meta">${animal.gender} · ${animal.ageMonths} months · ${animal.status}${animal.isUrgent ? " · URGENT" : ""} · ${escape(animal.province)}</p>
+      <p class="desc"><b>${animal.personality.map(escape).join(" · ")}</b><br>${escape(animal.description)}<br>${escape(animal.healthNote)}</p>
       <div class="photos">${photos}</div>
     </article>`;
 }

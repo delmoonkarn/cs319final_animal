@@ -17,10 +17,13 @@ export const animalListSelect = {
   breed: true,
   gender: true,
   ageMonths: true,
+  personality: true,
   isVaccinated: true,
+  isSterilized: true,
   isUrgent: true,
   status: true,
   locationFound: true,
+  province: true,
   imageUrls: true,
   adoptedAt: true,
   createdAt: true,
@@ -50,7 +53,7 @@ export const animalDetailInclude = {
       author: { select: { id: true, name: true, role: true } },
     },
   },
-  _count: { select: { favorites: true } },
+  _count: { select: { favorites: true, adoptionRequests: true } },
 } as const satisfies Prisma.AnimalInclude;
 
 type AnimalDetailRow = Prisma.AnimalGetPayload<{ include: typeof animalDetailInclude }>;
@@ -63,6 +66,8 @@ export type AnimalDetail = Omit<AnimalDetailRow, "imageUrls" | "updates" | "_cou
   /** All photos in order; the first is the cover */
   images: ImageDto[];
   favoriteCount: number;
+  /** How many people have sent an adoption request for this animal (any status) */
+  requestCount: number;
   /** Success-story timeline, oldest first (empty unless adopted) */
   updates: AnimalUpdateDto[];
 };
@@ -72,6 +77,7 @@ export function toAnimalDetail({ imageUrls, updates, _count, ...animal }: Animal
     ...animal,
     images: imageUrls.map(toImageDto),
     favoriteCount: _count.favorites,
+    requestCount: _count.adoptionRequests,
     updates: updates.map(({ imageUrls: updateImages, ...update }) => ({
       ...update,
       images: updateImages.map(toImageDto),

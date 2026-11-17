@@ -10,7 +10,7 @@ import {
 } from "../lib/donation-dto";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
-import { deleteImages } from "../lib/storage";
+import { deleteUnusedImages } from "../lib/image-cleanup";
 import { getAuthUser } from "../middlewares/auth";
 import type { Paginated } from "../types/api";
 import { idParamSchema } from "../validators/common";
@@ -140,6 +140,6 @@ export async function deleteDonation(req: Request, res: Response): Promise<void>
     }
   }
 
-  await deleteImages([donation.slipUrl]);
+  await deleteUnusedImages([donation.slipUrl]);
   res.status(204).end();
 }

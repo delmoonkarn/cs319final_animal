@@ -7,6 +7,7 @@ import type {
   Role,
   Species,
 } from "@prisma/client";
+import type { Province } from "../src/lib/provinces";
 
 /**
  * Seed data. Records reference each other by `key` / email, never by database id
@@ -38,11 +39,16 @@ export type AnimalSeed = {
   breed: string;
   gender: Gender;
   ageMonths: number;
-  personality: string;
+  /** 1–8 short tags */
+  personality: string[];
+  description: string;
+  /** Health history, one entry per line */
   healthNote: string;
   isVaccinated: boolean;
+  isSterilized: boolean;
   isUrgent: boolean;
   locationFound: string;
+  province: Province;
   status: AnimalStatus;
   /**
    * 1–5 photo links, the first one is the cover. Currently Wikimedia Commons photos (credits in
@@ -58,9 +64,11 @@ export type AnimalSeed = {
 export const animals: AnimalSeed[] = [
   {
     key: "khaotang", name: "ข้าวตัง", species: "DOG", breed: "ไทยหลังอาน", gender: "MALE", ageMonths: 18,
-    personality: "ร่าเริง ขี้เล่น ชอบวิ่งเล่นในสนาม เข้ากับเด็กได้ดี",
+    personality: ["ร่าเริง", "ขี้เล่น", "ชอบวิ่งเล่น", "เข้ากับเด็กได้ดี"],
+    description: "ข้าวตังถูกพบวิ่งเล่นอยู่ในซอยลาดพร้าว 101 เป็นหมาพลังเยอะที่ชอบวิ่งในสนามและเข้ากับเด็กได้ดีมาก",
     healthNote: "ทำหมันแล้ว ถ่ายพยาธิแล้ว สุขภาพแข็งแรง",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยลาดพร้าว 101 เขตบางกะปิ",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ซอยลาดพร้าว 101 เขตบางกะปิ", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 160, adoptedDaysAgo: 140,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Red_Thai_Ridgeback.jpg/960px-Red_Thai_Ridgeback.jpg",
@@ -70,9 +78,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "som-o", name: "ส้มโอ", species: "CAT", breed: "แมวไทยพันทาง", gender: "MALE", ageMonths: 14,
-    personality: "แมวส้มขี้อ้อน ชอบนอนตัก ชอบเล่นไม้ตกแมว",
+    personality: ["ขี้อ้อน", "ชอบนอนตัก", "ชอบเล่นไม้ตกแมว"],
+    description: "ส้มโออาศัยอยู่แถวร้านข้าวมันไก่ในซอยอารีย์ เป็นแมวส้มที่ขี้อ้อนและชอบนอนตักทุกครั้งที่มีโอกาส",
     healthNote: "ทำหมันแล้ว ถ่ายพยาธิแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ร้านข้าวมันไก่ ซอยอารีย์ เขตพญาไท",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ร้านข้าวมันไก่ ซอยอารีย์ เขตพญาไท", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 150, adoptedDaysAgo: 130,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Orange_Cat_at_MCS_Building.jpg/960px-Orange_Cat_at_MCS_Building.jpg",
@@ -80,9 +90,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "khanompang", name: "ขนมปัง", species: "OTHER", breed: "กระต่ายฮอลแลนด์ลอป", gender: "FEMALE", ageMonths: 14,
-    personality: "ขี้ตกใจกับเสียงดัง แต่ชอบให้ลูบหัว",
+    personality: ["ขี้ตกใจ", "ชอบให้ลูบหัว"],
+    description: "ขนมปังถูกปล่อยทิ้งไว้ในสวนจตุจักร ช่วงแรกตกใจง่ายกับเสียงดัง แต่ถ้าคุ้นเคยแล้วจะชอบให้ลูบหัวมาก",
     healthNote: "ถูกปล่อยทิ้งในสวนสาธารณะ ฟันปกติ กินหญ้าเก่ง",
-    isVaccinated: false, isUrgent: false, locationFound: "สวนจตุจักร เขตจตุจักร",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "สวนจตุจักร เขตจตุจักร", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 110, adoptedDaysAgo: 85,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Baby_Holland_Lop_1.png/960px-Baby_Holland_Lop_1.png",
@@ -91,29 +103,35 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "mochi", name: "โมจิ", species: "DOG", breed: "ปอมเมอเรเนียนผสม", gender: "FEMALE", ageMonths: 24,
-    personality: "ขี้อ้อน ติดคน ชอบให้อุ้ม เห่าเสียงแหลมเวลาตื่นเต้น",
+    personality: ["ขี้อ้อน", "ติดคน", "ชอบให้อุ้ม"],
+    description: "โมจิถูกทิ้งไว้หน้าคอนโดย่านอ่อนนุช เป็นหมาตัวเล็กที่ติดคนมาก ชอบให้อุ้ม และจะเห่าเสียงแหลมเวลาตื่นเต้น",
     healthNote: "ถูกทิ้งหน้าคอนโด ขนร่วงจากความเครียด ตอนนี้ขนเริ่มขึ้นแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "หน้าคอนโดย่านอ่อนนุช เขตสวนหลวง",
-    status: "PENDING", daysAgo: 75,
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "หน้าคอนโดย่านอ่อนนุช เขตสวนหลวง", province: "กรุงเทพมหานคร",
+    status: "AVAILABLE", daysAgo: 75,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/21Pom.jpg/960px-21Pom.jpg",
     ],
   },
   {
     key: "mok", name: "หมอก", species: "CAT", breed: "โคราช (สีสวาด)", gender: "MALE", ageMonths: 20,
-    personality: "สุขุม ชอบอยู่เงียบ ๆ ไม่ชอบเสียงดัง",
+    personality: ["สุขุม", "ชอบความเงียบ"],
+    description: "หมอกเป็นแมวสีสวาดที่อาศัยอยู่ในวัดพระศรีมหาธาตุ นิสัยสุขุม ชอบอยู่เงียบ ๆ เหมาะกับบ้านที่ไม่มีเสียงดัง",
     healthNote: "ทำหมันแล้ว แข็งแรงดี",
-    isVaccinated: true, isUrgent: false, locationFound: "วัดพระศรีมหาธาตุ เขตบางเขน",
-    status: "PENDING", daysAgo: 60,
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "วัดพระศรีมหาธาตุ เขตบางเขน", province: "กรุงเทพมหานคร",
+    status: "AVAILABLE", daysAgo: 60,
     imageUrls: [
       "https://upload.wikimedia.org/wikipedia/commons/c/c1/Veda%2Cchat-adulte-m%C3%A2le-race-korat.JPG",
     ],
   },
   {
     key: "dang", name: "ด่าง", species: "DOG", breed: "ไทยพันทาง", gender: "MALE", ageMonths: 30,
-    personality: "ขี้กลัวคนแปลกหน้าในช่วงแรก แต่ถ้าคุ้นแล้วจะติดมาก",
+    personality: ["ขี้กลัวคนแปลกหน้า", "ติดคนเมื่อคุ้นเคย"],
+    description: "ด่างถูกรถเฉี่ยวที่ปากซอยรามคำแหง 24 ช่วงแรกจะกลัวคนแปลกหน้า แต่เมื่อคุ้นเคยแล้วจะติดคนมาก ตอนนี้กำลังพักฟื้นหลังผ่าตัดขา",
     healthNote: "ถูกรถเฉี่ยว ขาหน้าขวาเพิ่งผ่าตัดใส่เหล็ก ต้องการบ้านที่ดูแลใกล้ชิด",
-    isVaccinated: false, isUrgent: true, locationFound: "ปากซอยรามคำแหง 24 เขตบางกะปิ",
+    isVaccinated: false, isSterilized: false, isUrgent: true,
+    locationFound: "ปากซอยรามคำแหง 24 เขตบางกะปิ", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 12,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Stray_dog_black_and_white.jpg/960px-Stray_dog_black_and_white.jpg",
@@ -121,9 +139,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "lukkaew", name: "ลูกแก้ว", species: "CAT", breed: "แมวไทยพันทาง", gender: "FEMALE", ageMonths: 1,
-    personality: "ลูกแมวตัวเล็ก ร้องเรียกแม่ตลอดเวลา",
+    personality: ["ตัวเล็ก", "ขี้อ้อน"],
+    description: "ลูกแก้วถูกพบในกองลังหลังแผงผักในตลาดห้วยขวางตอนอายุราว 3 สัปดาห์ ยังต้องป้อนนมและดูแลใกล้ชิด",
     healthNote: "พบตอนอายุราว 3 สัปดาห์ ต้องป้อนนมทุก 3-4 ชั่วโมง",
-    isVaccinated: false, isUrgent: true, locationFound: "ตลาดห้วยขวาง เขตห้วยขวาง",
+    isVaccinated: false, isSterilized: false, isUrgent: true,
+    locationFound: "ตลาดห้วยขวาง เขตห้วยขวาง", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 8,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/Black_Spotted_Tabby_Kitten-Supine-Thailand.jpg/960px-Black_Spotted_Tabby_Kitten-Supine-Thailand.jpg",
@@ -131,9 +151,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "thongyip", name: "ทองหยิบ", species: "DOG", breed: "โกลเด้นรีทรีฟเวอร์ผสม", gender: "MALE", ageMonths: 15,
-    personality: "พลังเยอะ ชอบเล่นน้ำ ชอบคาบของมาให้",
+    personality: ["พลังเยอะ", "ชอบเล่นน้ำ", "ชอบคาบของ"],
+    description: "ทองหยิบถูกพบริมคลองแสนแสบ เป็นหมาพลังเยอะที่ชอบเล่นน้ำและชอบคาบของมาให้คนเล่นด้วย",
     healthNote: "ทำหมันแล้ว แข็งแรงดี",
-    isVaccinated: true, isUrgent: false, locationFound: "ริมคลองแสนแสบ เขตวังทองหลาง",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ริมคลองแสนแสบ เขตวังทองหลาง", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 55,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/3052-Golden-Retriever-2_%2820505649281%29.jpg/960px-3052-Golden-Retriever-2_%2820505649281%29.jpg",
@@ -141,9 +163,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "nomsod", name: "นมสด", species: "CAT", breed: "ขาวมณี", gender: "FEMALE", ageMonths: 10,
-    personality: "เรียบร้อย ขี้เกรงใจ ชอบนั่งริมหน้าต่าง",
+    personality: ["เรียบร้อย", "ขี้เกรงใจ", "ชอบนั่งริมหน้าต่าง"],
+    description: "นมสดเป็นแมวขาวมณีตาสองสีที่ถูกพบในซอยงามวงศ์วาน นิสัยเรียบร้อยและขี้เกรงใจ ชอบนั่งดูวิวริมหน้าต่าง",
     healthNote: "ตาสองสี หูได้ยินปกติ ทำหมันแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยทองหล่อ เขตวัฒนา",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ซอยงามวงศ์วาน 23 อำเภอเมืองนนทบุรี", province: "นนทบุรี",
     status: "AVAILABLE", daysAgo: 45,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Khao_Manee_%22Leela%22.jpg/960px-Khao_Manee_%22Leela%22.jpg",
@@ -151,9 +175,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "tooptap", name: "ตุ๊บตั๊บ", species: "OTHER", breed: "เต่าแก้มแดง", gender: "UNKNOWN", ageMonths: 48,
-    personality: "เชื่องช้า ชอบอาบแดดบนก้อนหิน",
+    personality: ["เชื่องช้า", "ชอบอาบแดด"],
+    description: "ตุ๊บตั๊บเป็นเต่าแก้มแดงที่ถูกปล่อยในบ่อน้ำสวนรถไฟ ชอบขึ้นมาอาบแดดบนก้อนหิน ต้องการตู้เลี้ยงที่มีไฟ UVB",
     healthNote: "กระดองมีรอยถลอกเล็กน้อย ต้องการตู้ที่มีไฟ UVB",
-    isVaccinated: false, isUrgent: false, locationFound: "บ่อน้ำในสวนรถไฟ เขตจตุจักร",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "บ่อน้ำในสวนรถไฟ เขตจตุจักร", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 80,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/34/2018-06-16_Aradosee_Rotwangen-Schmuckschildkr%C3%B6te.jpg/960px-2018-06-16_Aradosee_Rotwangen-Schmuckschildkr%C3%B6te.jpg",
@@ -161,9 +187,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "makham", name: "มะขาม", species: "DOG", breed: "ไทยพันทาง", gender: "FEMALE", ageMonths: 36,
-    personality: "ใจดี นิ่ง ๆ ชอบนอนอาบแดด เดินสายจูงเก่ง",
+    personality: ["ใจดี", "นิ่ง ๆ", "เดินสายจูงเก่ง"],
+    description: "มะขามเป็นหมาประจำตลาดนัดจตุจักร นิสัยใจดีและนิ่ง ชอบนอนอาบแดด เดินสายจูงได้เก่ง",
     healthNote: "ทำหมันแล้ว มีโรคผิวหนังเล็กน้อย กำลังรักษาด้วยยาทา",
-    isVaccinated: true, isUrgent: false, locationFound: "ตลาดนัดจตุจักร เขตจตุจักร",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ตลาดนัดจตุจักร เขตจตุจักร", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 120,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/ba/Dog_sand.png/960px-Dog_sand.png",
@@ -171,9 +199,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "jaodam", name: "เจ้าดำ", species: "DOG", breed: "ไทยพันทาง", gender: "MALE", ageMonths: 60,
-    personality: "สุขุม รักเจ้าของ เฝ้าบ้านเก่งแต่ไม่ดุ",
+    personality: ["สุขุม", "รักเจ้าของ", "เฝ้าบ้านเก่ง"],
+    description: "เจ้าดำอาศัยอยู่ใต้สะพานพระราม 8 มาหลายปี เป็นหมาสูงวัยที่สุขุม เฝ้าบ้านเก่งแต่ไม่ดุ",
     healthNote: "ขาหลังซ้ายเคยหัก เดินกะเผลกเล็กน้อยแต่ไม่เจ็บแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ใต้สะพานพระราม 8 เขตบางพลัด",
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "ใต้สะพานพระราม 8 เขตบางพลัด", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 200,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/Blackthai.jpg/960px-Blackthai.jpg",
@@ -181,9 +211,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "thungthong", name: "ถุงทอง", species: "DOG", breed: "ไทยบางแก้วผสม", gender: "MALE", ageMonths: 6,
-    personality: "ซุกซน ช่างสงสัย กำลังหัดนั่งและรอคำสั่ง",
+    personality: ["ซุกซน", "ช่างสงสัย", "เรียนรู้ไว"],
+    description: "ถุงทองเป็นลูกหมาที่ถูกพบหน้าวัดบางพลีใหญ่ ซุกซนและช่างสงสัย กำลังหัดนั่งและรอคำสั่ง",
     healthNote: "ฉีดวัคซีนเข็มแรกแล้ว รอเข็มกระตุ้นสัปดาห์หน้า",
-    isVaccinated: false, isUrgent: false, locationFound: "หน้าวัดบางนาใน เขตบางนา",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "หน้าวัดบางพลีใหญ่ อำเภอบางพลี", province: "สมุทรปราการ",
     status: "AVAILABLE", daysAgo: 20,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/BangBon_Bangkok_28.10.2017_%2846%29.jpg/960px-BangBon_Bangkok_28.10.2017_%2846%29.jpg",
@@ -192,9 +224,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "pudding", name: "พุดดิ้ง", species: "DOG", breed: "พุดเดิ้ลผสม", gender: "FEMALE", ageMonths: 40,
-    personality: "อ่อนโยน ชอบให้แปรงขน เข้ากับแมวได้",
+    personality: ["อ่อนโยน", "ชอบให้แปรงขน", "เข้ากับแมวได้"],
+    description: "พุดดิ้งถูกพบในหมู่บ้านเสนานิเวศน์ เป็นหมาอ่อนโยนที่ชอบให้แปรงขนและอยู่ร่วมกับแมวได้",
     healthNote: "ทำหมันแล้ว ฟันเริ่มมีหินปูน",
-    isVaccinated: true, isUrgent: false, locationFound: "หมู่บ้านเสนานิเวศน์ เขตลาดพร้าว",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "หมู่บ้านเสนานิเวศน์ เขตลาดพร้าว", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 140, adoptedDaysAgo: 118,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Bell_Gold_Poodle.jpg/960px-Bell_Gold_Poodle.jpg",
@@ -202,9 +236,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "chaokuay", name: "เฉาก๊วย", species: "DOG", breed: "ไทยพันทาง", gender: "FEMALE", ageMonths: 84,
-    personality: "หมาสูงวัยใจดี ชอบเดินเล่นช้า ๆ ตอนเย็น",
+    personality: ["สูงวัย", "ใจดี", "ชอบเดินเล่นช้า ๆ"],
+    description: "เฉาก๊วยเป็นหมาสูงวัยที่อาศัยอยู่ในสวนลุมพินี ใจดีและชอบเดินเล่นช้า ๆ ตอนเย็น ต้องการบ้านที่ดูแลเรื่องสุขภาพ",
     healthNote: "มีต้อกระจกตาซ้าย ต้องกินยาบำรุงข้อทุกวัน",
-    isVaccinated: true, isUrgent: true, locationFound: "สวนลุมพินี เขตปทุมวัน",
+    isVaccinated: true, isSterilized: false, isUrgent: true,
+    locationFound: "สวนลุมพินี เขตปทุมวัน", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 90,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Wat_Ming_Mueang_dog.jpg/960px-Wat_Ming_Mueang_dog.jpg",
@@ -212,9 +248,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "mali", name: "มะลิ", species: "CAT", breed: "วิเชียรมาศ", gender: "FEMALE", ageMonths: 26,
-    personality: "ช่างพูด ร้องทักทายทุกครั้งที่เจอคน ติดเจ้าของ",
+    personality: ["ช่างพูด", "ติดเจ้าของ"],
+    description: "มะลิเป็นแมววิเชียรมาศที่ช่างพูดมาก ร้องทักทายทุกครั้งที่เจอคนและติดเจ้าของสุด ๆ",
     healthNote: "ทำหมันแล้ว ฉีดวัคซีนครบ",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยประชาราษฎร์บำเพ็ญ เขตห้วยขวาง",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ซอยประชาราษฎร์บำเพ็ญ เขตห้วยขวาง", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 130, adoptedDaysAgo: 110,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Wichien-maat-momo.jpg/960px-Wichien-maat-momo.jpg",
@@ -222,9 +260,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "khanun", name: "ขนุน", species: "CAT", breed: "แมวไทยพันทาง", gender: "MALE", ageMonths: 30,
-    personality: "แมวส้มนักเลงคุมซอย แต่กับคนขี้อ้อนมาก",
+    personality: ["นักเลง", "ขี้อ้อน"],
+    description: "ขนุนเป็นแมวส้มคุมซอยแถวถนนข้าวสาร ดูเป็นนักเลงกับแมวตัวอื่นแต่ขี้อ้อนกับคนมาก",
     healthNote: "หูขวามีรอยแหว่งจากการต่อสู้ ทำหมันแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยเจริญกรุง 32 เขตบางรัก",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ถนนข้าวสาร เขตพระนคร", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 70,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/Thanon_Khao_San%2C_Bangkok%2C_Thailand_%284244633188%29.jpg/960px-Thanon_Khao_San%2C_Bangkok%2C_Thailand_%284244633188%29.jpg",
@@ -234,19 +274,23 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "taohu", name: "เต้าหู้", species: "DOG", breed: "ไทยพันทาง", gender: "FEMALE", ageMonths: 12,
-    personality: "หมาขาวเรียบร้อย ขี้อาย เดินตามคนที่ไว้ใจ",
+    personality: ["เรียบร้อย", "ขี้อาย"],
+    description: "เต้าหู้เป็นหมาขาวที่อาศัยอยู่หน้ามหาวิทยาลัยเกษตรศาสตร์ ขี้อายในช่วงแรก แต่จะเดินตามคนที่ไว้ใจ",
     healthNote: "ทำหมันแล้ว ถ่ายพยาธิแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "หน้ามหาวิทยาลัยเกษตรศาสตร์ เขตจตุจักร",
-    status: "PENDING", daysAgo: 50,
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "หน้ามหาวิทยาลัยเกษตรศาสตร์ เขตจตุจักร", province: "กรุงเทพมหานคร",
+    status: "AVAILABLE", daysAgo: 50,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/DOG_THAI_WHITE.jpg/960px-DOG_THAI_WHITE.jpg",
     ],
   },
   {
     key: "chocolate", name: "ช็อกโกแลต", species: "DOG", breed: "ลาบราดอร์ผสม", gender: "MALE", ageMonths: 26,
-    personality: "เป็นมิตรกับทุกคน ชอบกินเป็นชีวิตจิตใจ",
+    personality: ["เป็นมิตร", "ชอบกิน"],
+    description: "ช็อกโกแลตเป็นมิตรกับทุกคนและชอบกินเป็นชีวิตจิตใจ ตอนนี้กำลังคุมอาหารเพื่อลดน้ำหนัก",
     healthNote: "น้ำหนักเกินเล็กน้อย กำลังคุมอาหาร",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยรัชดาภิเษก 36 เขตจตุจักร",
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "ซอยรัชดาภิเษก 36 เขตจตุจักร", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 40,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/76/BoraDK20050369.JPG/960px-BoraDK20050369.JPG",
@@ -255,9 +299,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "puifai", name: "ปุยฝ้าย", species: "CAT", breed: "เปอร์เซียผสม", gender: "FEMALE", ageMonths: 36,
-    personality: "ชอบนอนบนโซฟา ไม่ชอบให้อุ้มนาน ๆ",
+    personality: ["ชอบนอนโซฟา", "ไม่ชอบให้อุ้มนาน"],
+    description: "ปุยฝ้ายเป็นแมวขนยาวที่ถูกทิ้งไว้ในคอนโดย่านพระราม 9 ชอบนอนบนโซฟา และต้องการคนแปรงขนให้ทุกวัน",
     healthNote: "ขนยาวต้องแปรงทุกวัน มีน้ำตาไหลเล็กน้อย",
-    isVaccinated: true, isUrgent: false, locationFound: "คอนโดย่านพระราม 9 เขตห้วยขวาง",
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "คอนโดย่านพระราม 9 เขตห้วยขวาง", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 65,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/90/Persian_Cat_from_Kerala_01.jpg/960px-Persian_Cat_from_Kerala_01.jpg",
@@ -266,10 +312,12 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "sakura", name: "ซากุระ", species: "CAT", breed: "สก็อตติชโฟลด์ผสม", gender: "FEMALE", ageMonths: 18,
-    personality: "ขี้อ้อน เงียบ ชอบนอนหงายท้อง",
+    personality: ["ขี้อ้อน", "เงียบ", "ชอบนอนหงายท้อง"],
+    description: "ซากุระเป็นแมวหูพับที่ขี้อ้อนและเงียบ ชอบนอนหงายท้อง ต้องดูแลเรื่องข้อต่อตามสายพันธุ์",
     healthNote: "ข้อเท้าหลังแข็งเล็กน้อยตามสายพันธุ์ ต้องเสริมแคลเซียม",
-    isVaccinated: true, isUrgent: false, locationFound: "หน้าห้างเซ็นทรัลบางนา เขตบางนา",
-    status: "PENDING", daysAgo: 40,
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "หน้าห้างเซ็นทรัลบางนา เขตบางนา", province: "กรุงเทพมหานคร",
+    status: "AVAILABLE", daysAgo: 40,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Scottishfold-blue-yae2.jpg/960px-Scottishfold-blue-yae2.jpg",
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/Scottishfold-blue-yae.jpg/960px-Scottishfold-blue-yae.jpg",
@@ -277,9 +325,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "suea", name: "เสือ", species: "CAT", breed: "แมวไทยพันทาง", gender: "MALE", ageMonths: 48,
-    personality: "แมวลายสลิด อิสระ ชอบสำรวจ แต่กลับมานอนในบ้านทุกคืน",
+    personality: ["อิสระ", "ชอบสำรวจ"],
+    description: "เสือเป็นแมวลายสลิดที่ชอบสำรวจไปทั่วย่านเมืองเก่าภูเก็ต ผลตรวจ FIV เป็นบวกจึงต้องเลี้ยงระบบปิด",
     healthNote: "ผลตรวจ FIV เป็นบวก ควรเลี้ยงระบบปิดและแยกจากแมวตัวอื่น",
-    isVaccinated: true, isUrgent: true, locationFound: "ท่าเรือคลองสาน เขตคลองสาน",
+    isVaccinated: true, isSterilized: false, isUrgent: true,
+    locationFound: "ย่านเมืองเก่า อำเภอเมืองภูเก็ต", province: "ภูเก็ต",
     status: "AVAILABLE", daysAgo: 85,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/A_stray_cat_in_Phuket_City%2C_Thaland.jpg/960px-A_stray_cat_in_Phuket_City%2C_Thaland.jpg",
@@ -287,9 +337,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "latte", name: "ลาเต้", species: "CAT", breed: "ศุภลักษณ์", gender: "MALE", ageMonths: 28,
-    personality: "ชอบเดินตามคนไปทุกห้อง ร้องเสียงทุ้ม",
+    personality: ["ติดคน", "ร้องเสียงทุ้ม"],
+    description: "ลาเต้เป็นแมวศุภลักษณ์ที่ชอบเดินตามคนไปทุกห้อง ร้องเสียงทุ้มน่ารัก",
     healthNote: "ทำหมันแล้ว แข็งแรงดี",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยพหลโยธิน 7 เขตพญาไท",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ซอยพหลโยธิน 7 เขตพญาไท", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 115, adoptedDaysAgo: 90,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/19/SuphalakAyodia.jpg/960px-SuphalakAyodia.jpg",
@@ -297,9 +349,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "mek", name: "เมฆ", species: "CAT", breed: "ขาวมณี", gender: "MALE", ageMonths: 60,
-    personality: "สงบ ชอบนอนกลางวัน เข้ากับผู้สูงอายุได้ดี",
+    personality: ["สงบ", "ชอบนอนกลางวัน", "เข้ากับผู้สูงอายุ"],
+    description: "เมฆเป็นแมวขาวสูงวัยในชุมชนวัดสุทัศน์ นิสัยสงบ เหมาะกับบ้านที่มีผู้สูงอายุ แต่ต้องกินอาหารสูตรโรคไต",
     healthNote: "หูขวาไม่ได้ยิน เป็นโรคไตระยะเริ่มต้น ต้องกินอาหารสูตรไต",
-    isVaccinated: true, isUrgent: true, locationFound: "ชุมชนวัดสุทัศน์ เขตพระนคร",
+    isVaccinated: true, isSterilized: false, isUrgent: true,
+    locationFound: "ชุมชนวัดสุทัศน์ เขตพระนคร", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 100,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/Khaomanee_cat.jpg/960px-Khaomanee_cat.jpg",
@@ -307,9 +361,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "biscuit", name: "บิสกิต", species: "DOG", breed: "บีเกิ้ลผสม", gender: "FEMALE", ageMonths: 34,
-    personality: "จมูกไว ชอบดมกลิ่น ขี้เล่นและขี้อ้อน",
+    personality: ["จมูกไว", "ขี้เล่น", "ขี้อ้อน"],
+    description: "บิสกิตถูกพบวิ่งเล่นอยู่บนชายหาดชะอำ จมูกไว ชอบดมกลิ่นทุกอย่าง ขี้เล่นและขี้อ้อน",
     healthNote: "ทำหมันแล้ว แข็งแรงดี",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยอ่อนนุช 17 เขตสวนหลวง",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ชายหาดชะอำ อำเภอชะอำ", province: "เพชรบุรี",
     status: "AVAILABLE", daysAgo: 30,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/A_beagle_at_Cha-Am_Beach_02.jpg/960px-A_beagle_at_Cha-Am_Beach_02.jpg",
@@ -319,9 +375,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "tato", name: "ตาโต", species: "DOG", breed: "ชิวาวาผสม", gender: "MALE", ageMonths: 20,
-    personality: "ตัวเล็กใจใหญ่ เห่าเก่ง ติดเจ้าของมาก",
+    personality: ["ตัวเล็กใจใหญ่", "เห่าเก่ง", "ติดเจ้าของ"],
+    description: "ตาโตเดินวนอยู่หน้าห้างเดอะมอลล์บางกะปิหลายวันในสภาพผอมมาก ตัวเล็กแต่ใจใหญ่ เห่าเก่งและติดเจ้าของ",
     healthNote: "พบในสภาพผอมมาก ตอนนี้น้ำหนักเริ่มขึ้น ต้องกินอาหารเม็ดเล็ก",
-    isVaccinated: false, isUrgent: true, locationFound: "หน้าห้างเดอะมอลล์บางกะปิ เขตบางกะปิ",
+    isVaccinated: false, isSterilized: false, isUrgent: true,
+    locationFound: "หน้าห้างเดอะมอลล์บางกะปิ เขตบางกะปิ", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 18,
     imageUrls: [
       "https://upload.wikimedia.org/wikipedia/commons/3/30/1791588524950_chihuahua.jpg",
@@ -329,9 +387,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "lucky", name: "ลัคกี้", species: "DOG", breed: "ไซบีเรียนฮัสกี้ผสม", gender: "MALE", ageMonths: 36,
-    personality: "ชอบหอนตามเสียงไซเรน ต้องการพื้นที่วิ่งเล่น",
+    personality: ["ชอบหอน", "ต้องการพื้นที่วิ่ง"],
+    description: "ลัคกี้เป็นหมาลูกผสมฮัสกี้ที่ชอบหอนตามเสียงไซเรน ต้องการบ้านที่มีพื้นที่วิ่งเล่นและอากาศไม่ร้อนเกินไป",
     healthNote: "ไม่ทนอากาศร้อน ควรอยู่บ้านที่มีพื้นที่ร่มและเปิดแอร์ได้",
-    isVaccinated: true, isUrgent: false, locationFound: "หมู่บ้านย่านรามอินทรา เขตคันนายาว",
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "หมู่บ้านย่านลำลูกกา อำเภอลำลูกกา", province: "ปทุมธานี",
     status: "AVAILABLE", daysAgo: 58,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/3217-siberian-husky-dog_%2820314366700%29.jpg/960px-3217-siberian-husky-dog_%2820314366700%29.jpg",
@@ -339,9 +399,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "nongfah", name: "น้องฟ้า", species: "DOG", breed: "ไทยพันทาง", gender: "FEMALE", ageMonths: 2,
-    personality: "ลูกหมาขี้อ้อน ซุกซน ชอบมุดตามช่อง",
+    personality: ["ลูกหมา", "ขี้อ้อน", "ซุกซน"],
+    description: "น้องฟ้าถูกพบในกล่องข้างถังขยะ ซอยเพชรเกษม 48 ตอนนี้กำลังฟื้นฟูจากภาวะขาดสารอาหาร ชอบมุดตามช่อง",
     healthNote: "พบในกล่องข้างถังขยะ ขาดสารอาหาร กำลังฟื้นฟู",
-    isVaccinated: false, isUrgent: true, locationFound: "ข้างถังขยะ ซอยเพชรเกษม 48 เขตภาษีเจริญ",
+    isVaccinated: false, isSterilized: false, isUrgent: true,
+    locationFound: "ข้างถังขยะ ซอยเพชรเกษม 48 เขตภาษีเจริญ", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 6,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Puppy_reaching_through_a_grate.jpg/960px-Puppy_reaching_through_a_grate.jpg",
@@ -349,9 +411,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "hima", name: "หิมะ", species: "OTHER", breed: "กระต่ายไทยพันทาง", gender: "MALE", ageMonths: 8,
-    personality: "ชอบกระโดดเล่นตอนเย็น",
+    personality: ["ขี้เล่น", "ชอบกระโดด"],
+    description: "หิมะเป็นกระต่ายขาวที่ถูกทิ้งหน้าโรงเรียนย่านดอนเมือง ชอบกระโดดเล่นตอนเย็น",
     healthNote: "ขาหลังมีแผลถลอก ทายาแล้ว",
-    isVaccinated: false, isUrgent: false, locationFound: "หน้าโรงเรียนย่านดอนเมือง เขตดอนเมือง",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "หน้าโรงเรียนย่านดอนเมือง เขตดอนเมือง", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 26,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Conejo_en_el_pasto.JPG/960px-Conejo_en_el_pasto.JPG",
@@ -359,19 +423,23 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "thuadaeng", name: "ถั่วแดง", species: "OTHER", breed: "แกสบี้ (หนูตะเภา)", gender: "MALE", ageMonths: 10,
-    personality: "ส่งเสียงร้องดีใจทุกครั้งที่ได้ยินเสียงถุงผัก",
+    personality: ["ช่างส่งเสียง", "ชอบกินผัก"],
+    description: "ถั่วแดงเป็นแกสบี้ที่ถูกทิ้งในตลาดนัดจตุจักร ส่งเสียงร้องดีใจทุกครั้งที่ได้ยินเสียงถุงผัก",
     healthNote: "ต้องได้รับวิตามินซีเสริมทุกวัน",
-    isVaccinated: false, isUrgent: false, locationFound: "ตลาดนัดจตุจักร โซนสัตว์เลี้ยง เขตจตุจักร",
-    status: "PENDING", daysAgo: 35,
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "ตลาดนัดจตุจักร โซนสัตว์เลี้ยง เขตจตุจักร", province: "กรุงเทพมหานคร",
+    status: "AVAILABLE", daysAgo: 35,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/An_orange_American_guinea_pig.jpg/960px-An_orange_American_guinea_pig.jpg",
     ],
   },
   {
     key: "bualoi", name: "บัวลอย", species: "DOG", breed: "ไทยพันทาง", gender: "FEMALE", ageMonths: 22,
-    personality: "ร่าเริง ชอบเล่นกับหมาตัวอื่น",
+    personality: ["ร่าเริง", "ชอบเล่นกับหมาตัวอื่น"],
+    description: "บัวลอยเคยอยู่ในชุมชนริมทางรถไฟมักกะสัน นิสัยร่าเริงและชอบเล่นกับหมาตัวอื่น",
     healthNote: "ทำหมันแล้ว แข็งแรงดี",
-    isVaccinated: true, isUrgent: false, locationFound: "ชุมชนริมทางรถไฟมักกะสัน เขตราชเทวี",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ชุมชนริมทางรถไฟมักกะสัน เขตราชเทวี", province: "กรุงเทพมหานคร",
     status: "ADOPTED", daysAgo: 125, adoptedDaysAgo: 100,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/2_dogs%2C_one_sitting%2C_one_standing.jpg/960px-2_dogs%2C_one_sitting%2C_one_standing.jpg",
@@ -379,9 +447,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "moodaeng", name: "หมูแดง", species: "DOG", breed: "ไทยพันทาง", gender: "MALE", ageMonths: 42,
-    personality: "หมาวัด คุ้นกับคนเยอะ ใจเย็น",
+    personality: ["หมาวัด", "ใจเย็น", "คุ้นกับคน"],
+    description: "หมูแดงเป็นหมาประจำวัดพระสิงห์ที่เชียงใหม่ คุ้นเคยกับคนเยอะและใจเย็นมาก",
     healthNote: "เคยเป็นพยาธิเม็ดเลือดเมื่อปีก่อน รักษาหายแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "วัดสระเกศ เขตป้อมปราบศัตรูพ่าย",
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "วัดพระสิงห์ อำเภอเมืองเชียงใหม่", province: "เชียงใหม่",
     status: "AVAILABLE", daysAgo: 95,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Wat_Phra_Singh_dog_-_Chiang_Mai.jpg/960px-Wat_Phra_Singh_dog_-_Chiang_Mai.jpg",
@@ -389,9 +459,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "toob", name: "ตูบ", species: "DOG", breed: "ไทยหลังอาน", gender: "MALE", ageMonths: 9,
-    personality: "ขี้เล่น ซื่อสัตย์ เรียนรู้ไว",
+    personality: ["ขี้เล่น", "ซื่อสัตย์", "เรียนรู้ไว"],
+    description: "ตูบเป็นหมาไทยหลังอานวัยรุ่นที่ถูกพบในตลาดรังสิต ขี้เล่น ซื่อสัตย์ และเรียนรู้คำสั่งได้ไว",
     healthNote: "ฉีดวัคซีนพิษสุนัขบ้าแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ตลาดมีนบุรี เขตมีนบุรี",
+    isVaccinated: true, isSterilized: false, isUrgent: false,
+    locationFound: "ตลาดรังสิต อำเภอธัญบุรี", province: "ปทุมธานี",
     status: "AVAILABLE", daysAgo: 25,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Sunray_vom_Crown_Hill.jpeg/960px-Sunray_vom_Crown_Hill.jpeg",
@@ -400,9 +472,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "taengmo", name: "แตงโม", species: "DOG", breed: "ไทยพันทาง", gender: "FEMALE", ageMonths: 5,
-    personality: "ลูกหมาขี้เล่น ชอบกัดรองเท้า",
+    personality: ["ลูกหมา", "ขี้เล่น", "ชอบกัดรองเท้า"],
+    description: "แตงโมเป็นลูกหมาที่ถูกพบที่ปั๊มน้ำมันถนนกาญจนาภิเษก ขี้เล่นมากและชอบกัดรองเท้า",
     healthNote: "ถ่ายพยาธิแล้ว ฉีดวัคซีนเข็มแรก",
-    isVaccinated: false, isUrgent: false, locationFound: "ปั๊มน้ำมันถนนกาญจนาภิเษก เขตบางแค",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "ปั๊มน้ำมันถนนกาญจนาภิเษก เขตบางแค", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 15,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/Puppy_in_Thailand.jpg/960px-Puppy_in_Thailand.jpg",
@@ -410,9 +484,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "cocoa", name: "โกโก้", species: "CAT", breed: "แมวไทยพันทาง", gender: "FEMALE", ageMonths: 8,
-    personality: "แมวดำตาสีเหลือง ซน ชอบปีนป่าย",
+    personality: ["ซน", "ชอบปีนป่าย"],
+    description: "โกโก้เป็นแมวดำตาสีเหลือง ซนและชอบปีนป่ายที่สูง",
     healthNote: "ทำหมันแล้ว ถ่ายพยาธิแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยอุดมสุข 42 เขตบางนา",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ซอยอุดมสุข 42 เขตบางนา", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 22,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/31/Black_Cat_in_Thailand_01.jpg/960px-Black_Cat_in_Thailand_01.jpg",
@@ -422,9 +498,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "khaoniao", name: "ข้าวเหนียว", species: "CAT", breed: "แมวไทยพันทาง", gender: "MALE", ageMonths: 16,
-    personality: "แมวขาวดำ ชอบเล่นซ่อนหา ชอบกล่องกระดาษ",
+    personality: ["ขี้เล่น", "ชอบกล่องกระดาษ"],
+    description: "ข้าวเหนียวเป็นแมวขาวดำที่ชอบเล่นซ่อนหาและมุดกล่องกระดาษ",
     healthNote: "ทำหมันแล้ว",
-    isVaccinated: true, isUrgent: false, locationFound: "ซอยสาทร 11 เขตสาทร",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ซอยสาทร 11 เขตสาทร", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 48,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Bangkok_kitty_-_2017-05-13_%28001%29.jpg/960px-Bangkok_kitty_-_2017-05-13_%28001%29.jpg",
@@ -432,9 +510,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "khaitun", name: "ไข่ตุ๋น", species: "CAT", breed: "แมวไทยพันทาง", gender: "FEMALE", ageMonths: 18,
-    personality: "แมวสามสีพลังเยอะ ชอบไล่จับเท้าคน",
+    personality: ["พลังเยอะ", "ชอบไล่จับเท้า"],
+    description: "ไข่ตุ๋นเป็นแมวสามสีพลังเยอะจากตลาดบางกะปิ ชอบไล่จับเท้าคนเป็นที่สุด",
     healthNote: "ทำหมันแล้ว ฉีดวัคซีนครบ",
-    isVaccinated: true, isUrgent: false, locationFound: "ตลาดบางกะปิ เขตบางกะปิ",
+    isVaccinated: true, isSterilized: true, isUrgent: false,
+    locationFound: "ตลาดบางกะปิ เขตบางกะปิ", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 10,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Tortoiseshell_cats_in_Wat_Khung_Taphao_1.jpg/960px-Tortoiseshell_cats_in_Wat_Khung_Taphao_1.jpg",
@@ -442,9 +522,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "itim", name: "ไอติม", species: "CAT", breed: "แมวไทยพันทาง", gender: "FEMALE", ageMonths: 5,
-    personality: "ลูกแมวขาวส้มขี้อ้อน ชอบให้เกาคาง",
+    personality: ["ขี้อ้อน", "ชอบให้เกาคาง"],
+    description: "ไอติมเป็นลูกแมวขาวส้มที่ถูกพบในหอพักนักศึกษาย่านลาดกระบัง ขี้อ้อนและชอบให้เกาคาง",
     healthNote: "เคยติดหวัดแมว รักษาหายแล้ว ถ่ายพยาธิแล้ว",
-    isVaccinated: false, isUrgent: false, locationFound: "หอพักนักศึกษาย่านลาดกระบัง เขตลาดกระบัง",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "หอพักนักศึกษาย่านลาดกระบัง เขตลาดกระบัง", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 28,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Wat_Kungtapao_Local_Museum006.jpg/960px-Wat_Kungtapao_Local_Museum006.jpg",
@@ -452,9 +534,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "bamee", name: "บะหมี่", species: "CAT", breed: "แมวไทยพันทาง", gender: "MALE", ageMonths: 6,
-    personality: "ลูกแมวลายเสือส้ม กล้าหาญ ไม่กลัวหมา",
+    personality: ["กล้าหาญ", "ไม่กลัวหมา"],
+    description: "บะหมี่เป็นลูกแมวลายเสือส้มจากอู่ซ่อมรถ กล้าหาญจนไม่กลัวหมา",
     healthNote: "ถ่ายพยาธิแล้ว",
-    isVaccinated: false, isUrgent: false, locationFound: "อู่ซ่อมรถ ซอยประชาอุทิศ เขตทุ่งครุ",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "อู่ซ่อมรถ ซอยประชาอุทิศ เขตทุ่งครุ", province: "กรุงเทพมหานคร",
     status: "AVAILABLE", daysAgo: 14,
     imageUrls: [
       "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Ginger_kitten_with_an_orange_rubber_rugby.jpg/960px-Ginger_kitten_with_an_orange_rubber_rugby.jpg",
@@ -462,9 +546,11 @@ export const animals: AnimalSeed[] = [
   },
   {
     key: "khaijiao", name: "ไข่เจียว", species: "OTHER", breed: "ไก่แจ้", gender: "FEMALE", ageMonths: 12,
-    personality: "เดินตามคนเหมือนลูกหมา ชอบคุ้ยดิน",
+    personality: ["เชื่อง", "ชอบคุ้ยดิน"],
+    description: "ไข่เจียวเป็นไก่แจ้ที่เดินตามคนเหมือนลูกหมา ชอบคุ้ยดินหาอาหาร และยังออกไข่ได้",
     healthNote: "แข็งแรงดี ออกไข่ได้",
-    isVaccinated: false, isUrgent: false, locationFound: "ชุมชนริมคลองบางกอกน้อย เขตบางกอกน้อย",
+    isVaccinated: false, isSterilized: false, isUrgent: false,
+    locationFound: "ชุมชนริมคลองบางกรวย อำเภอบางกรวย", province: "นนทบุรี",
     status: "AVAILABLE", daysAgo: 44,
     imageUrls: [
       "https://upload.wikimedia.org/wikipedia/commons/d/d4/Old_English_Bantam_hen_in_barnyard.jpg",
@@ -502,7 +588,7 @@ export const adoptionRequests: AdoptionRequestSeed[] = [
   // A rejected request on an adopted animal (someone else was approved)
   { user: "user4@test.com", animal: "khaotang", housingType: "CONDO", status: "REJECTED", daysAgo: 148,
     reason: "ชอบหมาพันธุ์ไทย อยากมีเพื่อนวิ่งออกกำลังกายตอนเช้า" },
-  // PENDING animals: at least one PENDING request each
+  // Requests still waiting for the admin (their animals stay AVAILABLE)
   { user: "user5@test.com", animal: "mochi", housingType: "CONDO", status: "PENDING", daysAgo: 5,
     reason: "คอนโดอนุญาตให้เลี้ยงสัตว์ขนาดเล็ก และมีคนอยู่ห้องเกือบตลอดเวลา" },
   { user: "user2@test.com", animal: "mochi", housingType: "CONDO", status: "PENDING", daysAgo: 3,

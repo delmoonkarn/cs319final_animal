@@ -35,13 +35,28 @@ function toPublicUrl(path: string): string {
   return bucket().getPublicUrl(path).data.publicUrl;
 }
 
-/** Storage path of the full-size file behind a URL of ours, or null for any other URL. */
+/** <yyyy>/<mm>/<uuid>.webp — the path of a full-size file created by uploadImage(). */
+const UPLOAD_PATH = /^\d{4}\/\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/;
+
+/**
+ * Storage path behind a URL exactly as uploadImage() returns it, or null for any other URL
+ * (other sites, thumbnails, or our URLs with extra query strings etc.).
+ */
 function toStoragePath(url: string): string | null {
   if (!url.startsWith(publicUrlPrefix)) {
     return null;
   }
-  const path = decodeURI(url.slice(publicUrlPrefix.length).split(/[?#]/)[0]);
-  return path.replace(new RegExp(`${THUMB_SUFFIX}\\.webp$`), ".webp");
+  const path = url.slice(publicUrlPrefix.length);
+  return UPLOAD_PATH.test(path) ? path : null;
+}
+
+/**
+ * Image links the API accepts: external links, or the exact `url` POST /api/uploads returned.
+ * Other links into our bucket (thumbUrl, added query strings, …) are refused, so every record
+ * that shows an uploaded photo stores the same string (deleteUnusedImages relies on that).
+ */
+export function isAcceptedImageUrl(url: string): boolean {
+  return !url.startsWith(publicUrlPrefix) || toStoragePath(url) !== null;
 }
 
 /**

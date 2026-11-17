@@ -74,12 +74,20 @@ function validateSeedData(): void {
     check(animal.imageUrls.length >= 1 && animal.imageUrls.length <= 5, `${animal.key}: needs 1-5 imageUrls`);
     check(new Set(animal.imageUrls).size === animal.imageUrls.length, `${animal.key}: the same image is listed twice`);
     check(animal.imageUrls.every(isHttpUrl), `${animal.key}: every image must be an http(s) link`);
+    check(
+      animal.personality.length >= 1 && animal.personality.length <= 8 &&
+        new Set(animal.personality).size === animal.personality.length &&
+        animal.personality.every((tag) => tag.trim().length > 0),
+      `${animal.key}: needs 1-8 different, non-empty personality tags`,
+    );
+    check(animal.description.trim().length > 0, `${animal.key}: needs a description`);
 
     if (animal.status === "ADOPTED") {
       const approved = requests.find((r) => r.status === "APPROVED");
       const updates = animalUpdates.filter((u) => u.animal === animal.key);
       check(countWith("APPROVED") === 1, `${animal.key}: ADOPTED needs exactly one APPROVED request`);
       check(countWith("PENDING") === 0, `${animal.key}: ADOPTED can't have PENDING requests`);
+      check(!animal.isUrgent, `${animal.key}: ADOPTED animals can't be urgent`);
       check(
         animal.adoptedDaysAgo !== undefined && animal.adoptedDaysAgo < animal.daysAgo,
         `${animal.key}: ADOPTED needs adoptedDaysAgo, later than the listing date`,
@@ -92,10 +100,6 @@ function validateSeedData(): void {
     } else {
       check(animal.adoptedDaysAgo === undefined, `${animal.key}: only ADOPTED animals have adoptedDaysAgo`);
       check(countWith("APPROVED") === 0, `${animal.key}: only ADOPTED animals can have an APPROVED request`);
-      check(
-        animal.status === "PENDING" ? countWith("PENDING") >= 1 : countWith("PENDING") === 0,
-        `${animal.key}: PENDING animals need a PENDING request, AVAILABLE ones none`,
-      );
     }
   }
 
@@ -210,11 +214,14 @@ async function main(): Promise<void> {
     gender: a.gender,
     ageMonths: a.ageMonths,
     personality: a.personality,
+    description: a.description,
     healthNote: a.healthNote,
     isVaccinated: a.isVaccinated,
+    isSterilized: a.isSterilized,
     isUrgent: a.isUrgent,
     imageUrls: a.imageUrls,
     locationFound: a.locationFound,
+    province: a.province,
     status: a.status,
     adoptedAt: a.adoptedDaysAgo === undefined ? null : daysAgo(a.adoptedDaysAgo),
     createdAt: daysAgo(a.daysAgo),

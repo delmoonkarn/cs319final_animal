@@ -57,7 +57,10 @@ GET {{baseUrl}}/animals?status=AVAILABLE
 ### Filters: urgent cats
 GET {{baseUrl}}/animals?species=CAT&isUrgent=true
 
-### Search (name, breed, location) + sort
+### Filters: sterilized animals in นนทบุรี (province names come from GET /provinces)
+GET {{baseUrl}}/animals?province=นนทบุรี&isSterilized=true
+
+### Search (name, breed, description, location, province) + sort
 GET {{baseUrl}}/animals?q=บางกะปิ&sort=urgent
 
 ### Page 2 with 5 per page
@@ -66,8 +69,8 @@ GET {{baseUrl}}/animals?page=2&pageSize=5
 ### Detail of {{availableId}} (or put any id from the list)
 GET {{baseUrl}}/animals/{{availableId}}
 
-### Create (admin) — RUN THIS FIRST (must return 201) before the edit/delete requests below.
-### imageUrls normally come from POST /uploads
+### Create (admin) — RUN THIS FIRST (must return 201) before the edit/delete requests below
+# imageUrls normally come from POST /uploads
 # @name createdAnimal
 POST {{baseUrl}}/animals
 Authorization: Bearer {{adminToken}}
@@ -79,11 +82,14 @@ Content-Type: application/json
   "breed": "แมวไทยพันทาง",
   "gender": "FEMALE",
   "ageMonths": 7,
-  "personality": "ขี้เล่น ชอบไล่จับของเล่น",
-  "healthNote": "ทำหมันแล้ว",
+  "personality": ["ขี้เล่น", "ชอบไล่จับของเล่น"],
+  "description": "พบที่ปากซอย ชอบมานั่งรอคนให้อาหารทุกเย็น",
+  "healthNote": "ทำหมันแล้ว\nฉีดวัคซีนครบแล้ว",
   "isVaccinated": true,
+  "isSterilized": true,
   "imageUrls": ["https://picsum.photos/seed/mamuang/800/600"],
-  "locationFound": "ซอยอารีย์ เขตพญาไท"
+  "locationFound": "ซอยอารีย์ เขตพญาไท",
+  "province": "กรุงเทพมหานคร"
 }
 
 ### Edit the animal created above (admin)
@@ -91,7 +97,21 @@ PATCH {{baseUrl}}/animals/{{createdAnimal.response.body.$.id}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-{ "name": "มะม่วง (แก้ไขแล้ว)", "isUrgent": true }
+{ "name": "มะม่วง (แก้ไขแล้ว)", "isUrgent": true, "personality": ["ขี้เล่น", "ขี้อ้อน"] }
+
+### Mark the animal above as adopted outside the website (admin) — pending requests for it are rejected
+PATCH {{baseUrl}}/animals/{{createdAnimal.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "ADOPTED" }
+
+### Put it back up for adoption (admin)
+PATCH {{baseUrl}}/animals/{{createdAnimal.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "AVAILABLE" }
 
 ### Delete the animal created above (admin)
 DELETE {{baseUrl}}/animals/{{createdAnimal.response.body.$.id}}
@@ -114,8 +134,9 @@ Content-Type: application/json
 
 ######################## Adoption requests ########################
 
-### user1 applies for {{availableId}} — RUN THIS FIRST (must return 201) before cancel/approve/reject below.
-### If it returns 409 (already applied), re-run "List AVAILABLE animals" and send this again.
+### user1 applies for {{availableId}} — RUN THIS FIRST (must return 201)
+# If it returns 409 (already applied), re-run "List AVAILABLE animals" and send this again.
+# Then pick ONE of the three [choice] requests below — they all act on this same request.
 # @name myRequest
 POST {{baseUrl}}/adoption-requests
 Authorization: Bearer {{userToken}}
@@ -127,31 +148,31 @@ Content-Type: application/json
 GET {{baseUrl}}/adoption-requests/me
 Authorization: Bearer {{userToken}}
 
-### user1 cancels the request above (only while PENDING) — needs "user1 applies" to have returned 201
-DELETE {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
-Authorization: Bearer {{userToken}}
-
-### user1 cancels a request by id — get the id ("id" at the top, not animal.id) from "user1's requests"
-DELETE {{baseUrl}}/adoption-requests/16
-Authorization: Bearer {{userToken}}
-
-### Admin: all pending requests
+### Admin: all pending requests (with the applicant's contact details)
 GET {{baseUrl}}/adoption-requests?status=PENDING
 Authorization: Bearer {{adminToken}}
 
-### Admin: approve the request above (animal → ADOPTED, other requests → REJECTED)
+### [choice] Admin: approve the request above (animal → ADOPTED, other requests → REJECTED)
 PATCH {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 { "status": "APPROVED" }
 
-### Admin: reject the request above instead
+### [choice] Admin: reject the request above (the animal stays AVAILABLE)
 PATCH {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 { "status": "REJECTED" }
+
+### [choice] user1 cancels the request above (only while PENDING)
+DELETE {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+
+### user1 cancels any request by id — get the id ("id" at the top, not animal.id) from "user1's requests"
+DELETE {{baseUrl}}/adoption-requests/16
+Authorization: Bearer {{userToken}}
 
 
 ######################## Favorites ########################
@@ -204,7 +225,8 @@ Authorization: Bearer {{userToken}}
 
 ######################## Reports ########################
 
-### user1 reports a found animal — RUN THIS FIRST before approve/reject below
+### user1 reports a found animal — RUN THIS FIRST (must return 201)
+# Then pick ONE of the three [choice] requests below — they all act on this same report.
 # @name myReport
 POST {{baseUrl}}/reports
 Authorization: Bearer {{userToken}}
@@ -222,11 +244,15 @@ Content-Type: application/json
 GET {{baseUrl}}/reports/me
 Authorization: Bearer {{userToken}}
 
-### Admin: pending reports
+### One report: the report above (the reporter or an admin can view it)
+GET {{baseUrl}}/reports/{{myReport.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+
+### Admin: pending reports (with the reporter's contact details)
 GET {{baseUrl}}/reports?status=PENDING
 Authorization: Bearer {{adminToken}}
 
-### Admin: approve the report above → creates an animal listing from it
+### [choice] Admin: approve the report above → creates an animal listing from it
 PATCH {{baseUrl}}/reports/{{myReport.response.body.$.id}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
@@ -237,18 +263,24 @@ Content-Type: application/json
     "name": "ขาวมณี",
     "gender": "MALE",
     "ageMonths": 24,
-    "personality": "ขี้กลัวในช่วงแรก",
+    "personality": ["ขี้กลัวในช่วงแรก"],
+    "description": "ชาวบ้านพบนอนอยู่หน้าตลาดนัด ผอมมาก",
     "healthNote": "ขาหลังเจ็บ รอพบสัตวแพทย์",
+    "province": "กรุงเทพมหานคร",
     "isUrgent": true
   }
 }
 
-### Admin: reject the report above instead (its photos are deleted)
+### [choice] Admin: reject the report above (its photos are deleted)
 PATCH {{baseUrl}}/reports/{{myReport.response.body.$.id}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 { "status": "REJECTED" }
+
+### [choice] user1 deletes the report above (reporter: only while PENDING; admin: any report)
+DELETE {{baseUrl}}/reports/{{myReport.response.body.$.id}}
+Authorization: Bearer {{userToken}}
 
 
 ######################## Donations ########################
@@ -260,7 +292,8 @@ GET {{baseUrl}}/donation-packages
 ### Public total for the homepage
 GET {{baseUrl}}/donations/summary
 
-### user1 donates (total is calculated by the server) — RUN THIS FIRST before confirm below
+### user1 donates (total is calculated by the server) — RUN THIS FIRST (must return 201)
+# Then pick ONE of the two [choice] requests below — they both act on this same donation.
 # @name myDonation
 POST {{baseUrl}}/donations
 Authorization: Bearer {{userToken}}
@@ -278,23 +311,52 @@ Content-Type: application/json
 GET {{baseUrl}}/donations/me
 Authorization: Bearer {{userToken}}
 
-### Admin: pending donations
+### Admin: pending donations (with the donor's contact details)
 GET {{baseUrl}}/donations?status=PENDING
 Authorization: Bearer {{adminToken}}
 
-### Admin: confirm the donation above
+### [choice] Admin: confirm the donation above
 PATCH {{baseUrl}}/donations/{{myDonation.response.body.$.id}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 { "status": "CONFIRMED" }
 
-### Admin: add a package
+### [choice] user1 deletes the donation above (donor: only while PENDING; admin: any) — its slip photo is deleted too
+DELETE {{baseUrl}}/donations/{{myDonation.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+
+### Admin: add a package — RUN THIS FIRST before edit/delete below
+# @name newPackage
 POST {{baseUrl}}/donation-packages
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 { "name": "ปลอกคอและสายจูง", "description": "ปลอกคอพร้อมป้ายชื่อและสายจูง 1 ชุด", "price": 250, "icon": "🦮" }
+
+### Admin: edit the package above (past donations keep their old price)
+PATCH {{baseUrl}}/donation-packages/{{newPackage.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "price": 300 }
+
+### Admin: delete the package above (409 if it is already part of a donation)
+DELETE {{baseUrl}}/donation-packages/{{newPackage.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+
+
+######################## Stats & provinces ########################
+
+### Homepage stats bar (total, available, adopted, urgent)
+GET {{baseUrl}}/stats
+
+### Admin dashboard: the same + requests / reports / donations waiting for review
+GET {{baseUrl}}/stats/admin
+Authorization: Bearer {{adminToken}}
+
+### The 77 provinces (for the province dropdown)
+GET {{baseUrl}}/provinces
 
 
 ######################## Uploads ########################

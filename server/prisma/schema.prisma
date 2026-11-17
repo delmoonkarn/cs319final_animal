@@ -31,9 +31,9 @@ enum Gender {
   UNKNOWN
 }
 
+/// Only adoption requests are "pending"; the animal stays AVAILABLE until a request is approved.
 enum AnimalStatus {
   AVAILABLE
-  PENDING
   ADOPTED
 }
 
@@ -82,13 +82,21 @@ model Animal {
   breed         String
   gender        Gender
   ageMonths     Int
-  personality   String
+  /// Personality tags, e.g. ["ขี้อ้อน", "ชอบเดินเล่น"]
+  personality   String[]
+  /// Free-text story / details about the animal
+  description   String
+  /// Health history, one entry per line
   healthNote    String
   isVaccinated  Boolean      @default(false)
+  isSterilized  Boolean      @default(false)
   isUrgent      Boolean      @default(false)
   /// 1–5 full-size image URLs; the first one is the cover photo (count enforced by zod)
   imageUrls     String[]
+  /// Where exactly it was found, e.g. "ซอยลาดพร้าว 101 เขตบางกะปิ"
   locationFound String
+  /// One of the 77 Thai provinces (validated by the API, list at GET /api/provinces)
+  province      String
   status        AnimalStatus @default(AVAILABLE)
   adoptedAt     DateTime?
   createdAt     DateTime     @default(now())
@@ -103,6 +111,7 @@ model Animal {
   @@index([status])
   @@index([species])
   @@index([isUrgent])
+  @@index([province])
 }
 
 model AdoptionRequest {

@@ -1,16 +1,28 @@
 import { AnimalStatus, Gender, Species } from "@prisma/client";
 import { z } from "zod";
+import { THAI_PROVINCES } from "../lib/provinces";
 import { bodySchema, imageUrlsField, paginationQuery, textField } from "./common";
 
 export const MAX_ANIMAL_IMAGES = 5;
+export const MAX_PERSONALITY_TAGS = 8;
 
 export const speciesField = z.enum(Species, { error: "Species must be DOG, CAT or OTHER" });
 const genderField = z.enum(Gender, { error: "Gender must be MALE, FEMALE or UNKNOWN" });
-const statusField = z.enum(AnimalStatus, { error: "Status must be AVAILABLE, PENDING or ADOPTED" });
+/** AVAILABLE or ADOPTED. An admin sets ADOPTED by hand for adoptions arranged offline. */
+const statusField = z.enum(AnimalStatus, { error: "status must be AVAILABLE or ADOPTED" });
+export const provinceField = z.enum(THAI_PROVINCES, {
+  error: "province must be one of the 77 Thai provinces (see GET /api/provinces)",
+});
 
 const booleanField = (label: string) => z.boolean({ error: `${label} must be true or false` });
 
-/** Fields an admin can set. `status` / `adoptedAt` are not here: adoption requests drive them. */
+const personalityField = z
+  .array(textField("Personality tag", 40), { error: "personality must be a list of tags, e.g. [\"ขี้อ้อน\"]" })
+  .min(1, "Add at least 1 personality tag")
+  .max(MAX_PERSONALITY_TAGS, `Add at most ${MAX_PERSONALITY_TAGS} personality tags`)
+  .refine((tags) => new Set(tags).size === tags.length, { error: "The same personality tag is listed twice" });
+
+/** Fields an admin can set when creating or editing an animal. */
 export const animalFields = {
   name: textField("Name", 60),
   species: speciesField,
@@ -21,20 +33,28 @@ export const animalFields = {
     .int("ageMonths must be a whole number")
     .min(0, "ageMonths can't be negative")
     .max(360, "ageMonths must be at most 360"),
-  personality: textField("Personality", 1000),
-  healthNote: textField("Health note", 1000),
+  /** Tags such as ["ขี้อ้อน", "ชอบเดินเล่น"] */
+  personality: personalityField,
+  description: textField("Description", 2000),
+  /** Health history, one entry per line */
+  healthNote: textField("Health note", 2000),
   isVaccinated: booleanField("isVaccinated"),
+  isSterilized: booleanField("isSterilized"),
   isUrgent: booleanField("isUrgent"),
   /** 1–5 URLs from POST /api/uploads; the first one is the cover photo */
   imageUrls: imageUrlsField(1, MAX_ANIMAL_IMAGES),
   locationFound: textField("Location found", 200),
+  province: provinceField,
+  status: statusField,
 };
 
-/** POST /api/animals — new animals always start as AVAILABLE. */
+/** POST /api/animals — status defaults to AVAILABLE. */
 export const createAnimalSchema = bodySchema({
   ...animalFields,
   isVaccinated: animalFields.isVaccinated.optional(),
+  isSterilized: animalFields.isSterilized.optional(),
   isUrgent: animalFields.isUrgent.optional(),
+  status: animalFields.status.optional(),
 });
 
 /** PATCH /api/animals/:id — any subset of the fields. */
@@ -47,14 +67,16 @@ export const ANIMAL_SORTS = ["newest", "oldest", "urgent", "name"] as const;
 const optionalBooleanQuery = (label: string) =>
   z.stringbool({ error: `${label} must be true or false` }).optional();
 
-/** GET /api/animals?species=&status=&gender=&isUrgent=&isVaccinated=&q=&sort=&page=&pageSize= */
+/** GET /api/animals?species=&status=&gender=&province=&isUrgent=&isVaccinated=&isSterilized=&q=&sort=&page=&pageSize= */
 export const listAnimalsQuerySchema = z.object({
   species: speciesField.optional(),
   status: statusField.optional(),
   gender: genderField.optional(),
+  province: provinceField.optional(),
   isUrgent: optionalBooleanQuery("isUrgent"),
   isVaccinated: optionalBooleanQuery("isVaccinated"),
-  /** Search in name, breed and location */
+  isSterilized: optionalBooleanQuery("isSterilized"),
+  /** Search in name, breed, description, location and province */
   q: z.string({ error: "q must be text" }).trim().max(100, "q must be at most 100 characters").optional(),
   sort: z.enum(ANIMAL_SORTS, { error: `sort must be one of: ${ANIMAL_SORTS.join(", ")}` }).default("newest"),
   ...paginationQuery,

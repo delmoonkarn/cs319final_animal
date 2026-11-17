@@ -94,7 +94,8 @@ All seeded accounts use the password **`password123`**.
 | USER | `user4@test.com` | นภัสสร พงษ์ไทย |
 | USER | `user5@test.com` | ธนพล แก้วมณี |
 
-The seed also creates 40 animals (7 adopted, 5 pending, 28 available; 7 urgent), 15 adoption requests,
+The seed also creates 40 animals (7 adopted, 33 available; 7 urgent; 16 sterilized; 32 in
+กรุงเทพมหานคร, the rest in นนทบุรี, ปทุมธานี, สมุทรปราการ, เชียงใหม่, เพชรบุรี and ภูเก็ต), 15 adoption requests,
 21 favorites, 20 success-story updates, 8 community reports, 6 donation packages and 5 donations with
 9 items (130 records in total; the seed refuses to run with fewer than 40).
 
@@ -155,6 +156,11 @@ const thumb = (url: string) => (url.endsWith(".webp") ? url.replace(/\.webp$/, "
 Typical flow: upload images first → send the returned `url`s in the create request
 (animal, report, update or donation slip).
 
+- Image fields take the `url` exactly as returned. A `thumbUrl` or a changed link to our Storage
+  (e.g. with `?…` added) is refused with 400. Links to other sites are allowed.
+- A photo is deleted from Storage only when no animal, report, story or donation slip uses it
+  anymore. So deleting or editing one record never breaks a photo another record still shows.
+
 ### Animals
 
 | Method | Path | Auth | Response |
@@ -170,10 +176,11 @@ Typical flow: upload images first → send the returned `url`s in the create req
 | Param | Values | Default |
 | --- | --- | --- |
 | `species` | `DOG` / `CAT` / `OTHER` | – |
-| `status` | `AVAILABLE` / `PENDING` / `ADOPTED` | – |
+| `status` | `AVAILABLE` / `ADOPTED` | – |
 | `gender` | `MALE` / `FEMALE` / `UNKNOWN` | – |
-| `isUrgent`, `isVaccinated` | `true` / `false` | – |
-| `q` | search text (name, breed, location) | – |
+| `province` | one of the 77 names from `GET /provinces`, e.g. `กรุงเทพมหานคร` | – |
+| `isUrgent`, `isVaccinated`, `isSterilized` | `true` / `false` | – |
+| `q` | search text (name, breed, description, location, province) | – |
 | `sort` | `newest` / `oldest` / `urgent` / `name` | `newest` |
 | `page`, `pageSize` | numbers (`pageSize` max 50) | `1`, `12` |
 
@@ -182,16 +189,18 @@ Example: `GET /animals?species=CAT&isUrgent=true&q=บางนา&page=1&pageSi
 ```jsonc
 // AnimalListItem (cards)
 { "id": 3, "name": "โมจิ", "species": "DOG", "breed": "ปอมเมอเรเนียนผสม", "gender": "FEMALE",
-  "ageMonths": 24, "isVaccinated": true, "isUrgent": false, "status": "PENDING",
-  "locationFound": "…", "adoptedAt": null, "createdAt": "2026-…",
+  "ageMonths": 24, "personality": ["ขี้อ้อน", "ติดคน"],
+  "isVaccinated": true, "isSterilized": true, "isUrgent": false, "status": "AVAILABLE",
+  "locationFound": "…", "province": "กรุงเทพมหานคร", "adoptedAt": null, "createdAt": "2026-…",
   "coverImage": { "url": "…", "thumbUrl": "…" } }
 
 // pagination
 { "page": 1, "pageSize": 12, "total": 42, "totalPages": 4 }
 
-// AnimalDetail = every animal field (incl. personality, healthNote, updatedAt) plus:
+// AnimalDetail = every animal field (incl. description, healthNote, updatedAt) plus:
 { "images": [{ "url": "…", "thumbUrl": "…" }],            // first = cover
   "favoriteCount": 1,
+  "requestCount": 2,                                       // adoption requests ever made for it
   "updates": [{ "id": 1, "caption": "…", "createdAt": "…",  // success stories, oldest first
                 "images": [{ "url": "…", "thumbUrl": "…" }],
                 "author": { "id": 1, "name": "…", "role": "ADMIN" } }] }
@@ -202,17 +211,32 @@ Example: `GET /animals?species=CAT&isUrgent=true&q=บางนา&page=1&pageSi
 ```json
 {
   "name": "มะม่วง", "species": "CAT", "breed": "แมวไทยพันทาง", "gender": "FEMALE",
-  "ageMonths": 7, "personality": "ขี้เล่น", "healthNote": "ทำหมันแล้ว",
-  "isVaccinated": true, "isUrgent": false,
+  "ageMonths": 7, "personality": ["ขี้เล่น", "ขี้อ้อน"],
+  "description": "พบที่ปากซอย ชอบมานั่งรอคนให้อาหารทุกเย็น",
+  "healthNote": "ทำหมันแล้ว
+ฉีดวัคซีนครบแล้ว",
+  "isVaccinated": true, "isSterilized": true, "isUrgent": false,
   "imageUrls": ["<url from POST /uploads>", "…"],
-  "locationFound": "ซอยอารีย์ เขตพญาไท"
+  "locationFound": "ซอยอารีย์ เขตพญาไท", "province": "กรุงเทพมหานคร",
+  "status": "AVAILABLE"
 }
 ```
 
-- `imageUrls`: 1–5 URLs from `POST /uploads`, first one = cover. `isVaccinated` / `isUrgent` default to `false`.
-- `status` and `adoptedAt` can't be set here: new animals start `AVAILABLE`, and adoption requests
-  move them to `PENDING` / `ADOPTED`.
-- PATCH with a new `imageUrls` list deletes the photos you removed from Storage.
+- `imageUrls`: 1–5 URLs from `POST /uploads`, first one = cover. The three booleans default to `false`.
+- `personality`: 1–8 different tags (max 40 characters each). `description`: the animal's story,
+  max 2000 characters. `healthNote`: health history as plain text, one entry per line, max 2000.
+- `province`: must be exactly one of the names from `GET /provinces` (e.g. `กรุงเทพมหานคร`, not
+  `กรุงเทพฯ`). `locationFound` is the place inside it (soi, district).
+- `status` (optional): `AVAILABLE` (default) or `ADOPTED`, for animals adopted outside the website.
+  Animals have no "pending" status: only adoption requests are `PENDING`. `adoptedAt` is always
+  set by the server.
+- Setting `ADOPTED` (create or PATCH) sets `adoptedAt` to now and rejects every pending request for
+  the animal. Setting `AVAILABLE` on an adopted animal puts it back up for adoption (`adoptedAt`
+  cleared); if it was adopted through the website, that approved request becomes `REJECTED`, so the
+  old adopter can't post success stories for it anymore (their earlier stories are kept).
+- Adopted animals are never urgent: `isUrgent` is saved as `false` whenever the animal is (or
+  becomes) `ADOPTED` — by approval, by the status dropdown, or created as adopted.
+- PATCH with a new `imageUrls` list deletes the photos you removed from Storage (unless still used elsewhere).
 - DELETE also removes the animal's adoption requests, favorites, success stories and all their
   photos. A report it was created from is kept (unlinked).
 - Animal responses already include `thumbUrl` for every image.
@@ -237,17 +261,22 @@ Example: `GET /animals?species=CAT&isUrgent=true&q=บางนา&page=1&pageSi
 { …, "user": { "id": 2, "name": "สมชาย ใจดี", "email": "user1@test.com", "phone": "0811111111" } }
 ```
 
-How the animal's status follows the requests (all handled by the server):
+Only requests are `PENDING`. The animal stays `AVAILABLE` for everyone (others can still apply)
+until a request is approved (all handled by the server):
 
 | Event | Request | Animal |
 | --- | --- | --- |
-| First request on an `AVAILABLE` animal | `PENDING` | → `PENDING` |
-| Admin approves | → `APPROVED` | → `ADOPTED` (+ `adoptedAt`); every other pending request for it → `REJECTED` |
-| Admin rejects, or the user cancels, and no pending request is left | → `REJECTED` / deleted | → `AVAILABLE` |
+| A user applies | `PENDING` | stays `AVAILABLE` |
+| Admin approves | → `APPROVED` | → `ADOPTED` (+ `adoptedAt`, `isUrgent` false); every other pending request for it → `REJECTED` |
+| Admin rejects, or the user cancels | → `REJECTED` / deleted | no change |
+| A rejected user applies again | the same request → `PENDING` (new reason and date) | no change |
+| Admin sets the animal to `ADOPTED` by hand (`PATCH /animals/:id`) | every pending one → `REJECTED` | → `ADOPTED` (+ `adoptedAt`) |
 
 - `housingType`: `HOUSE` / `CONDO` / `DORM`. Only `USER` accounts can apply (admins get 403).
-- 409 errors: the animal is already adopted, the user already applied for it (one request per user
-  per animal, even after a rejection), or the request was already approved/rejected.
+- One request per user per animal: applying again is only allowed after a rejection, and reuses
+  that request (so the admin may see the same person again).
+- 409 errors: the animal is already adopted, the user already has a pending or approved request for
+  it, or the request was already approved/rejected.
 - Changes for the same animal run one at a time (database transaction + row lock), so an animal can
   never be approved for two people.
 - Response types: `server/src/lib/adoption-request-dto.ts`.
@@ -285,7 +314,8 @@ Response type: `server/src/lib/favorite-dto.ts`.
   "animal": { /* AnimalListItem */ } }
 ```
 
-- Only for `ADOPTED` animals (409 otherwise). The adopter = the user whose request was approved.
+- Only for `ADOPTED` animals (409 otherwise). The adopter = the user whose request was approved
+  (animals marked adopted by hand have no adopter, so only admins can post for them).
 - `imageUrls`: 1–4. Photos removed by PATCH, and all photos on DELETE, are deleted from Storage.
 - `AnimalDetail.updates` also lists an animal's stories (oldest first) for its timeline.
 
@@ -315,15 +345,17 @@ Reviewing (admin):
 
 { "status": "APPROVED",       // creates an AVAILABLE animal from the report and links it
   "animal": { "name": "แม่ส้ม", "gender": "FEMALE", "ageMonths": 24,
-              "personality": "…", "healthNote": "…",
+              "personality": ["…"], "description": "…", "healthNote": "…",
+              "province": "กรุงเทพมหานคร",
               // optional — taken from the report when left out:
               "breed": "…", "locationFound": "…", "imageUrls": ["…"],
-              "isVaccinated": false, "isUrgent": true } }
+              // optional, default false:
+              "isVaccinated": false, "isSterilized": false, "isUrgent": true } }
 ```
 
 - `imageUrls`: 1–3. `breed` is optional when reporting; it's required when approving if the report has none.
 - The new animal's species, photos and location come from the report. Those photos stay shared:
-  editing or deleting the animal never deletes photos the report still shows.
+  editing or deleting either one never deletes photos the other still shows.
 - 409: the report was already reviewed (only one admin can approve it).
 
 ### Donations
@@ -366,6 +398,17 @@ Reviewing (admin):
   admin confirms the slip. Deleting a donation also deletes its slip photo.
 - Slips are in the public bucket: anyone with the exact (random) link can open them.
 
+### Stats and provinces
+
+| Method | Path | Auth | Response |
+| --- | --- | --- | --- |
+| GET | `/stats` | – | `200 { total, available, adopted, urgent }` |
+| GET | `/stats/admin` | admin | the same + `pendingRequests, pendingReports, pendingDonations` |
+| GET | `/provinces` | – | `200 string[]` — the 77 Thai provinces, for the province dropdown |
+
+- `urgent` counts only urgent animals that are still available.
+- The `pending…` numbers are the admin's to-do queues (requests, reports and donation slips still `PENDING`).
+
 ### Health
 
 `GET /health` → `{ "status": "ok", "time": "…" }`
@@ -377,7 +420,7 @@ Nine tables, all with `id` (auto-increment) primary keys:
 | Table | Notes |
 | --- | --- |
 | `User` | `email` unique; `role` USER / ADMIN |
-| `Animal` | `species` DOG / CAT / OTHER; `status` AVAILABLE / PENDING / ADOPTED; 1–5 `imageUrls` (first is the cover); indexes on `status`, `species`, `isUrgent` |
+| `Animal` | `species` DOG / CAT / OTHER; `status` AVAILABLE / ADOPTED; `personality` text array (tags); `description`, `healthNote` text; `isVaccinated` / `isSterilized` / `isUrgent`; `province` + `locationFound`; 1–5 `imageUrls` (first is the cover); indexes on `status`, `species`, `isUrgent`, `province` |
 | `AdoptionRequest` | user → animal, `housingType` HOUSE / CONDO / DORM, `status` PENDING / APPROVED / REJECTED; unique `(userId, animalId)` |
 | `Favorite` | wishlist; unique `(userId, animalId)` |
 | `AnimalUpdate` | success-story timeline of an adopted animal, written by an admin or the adopter; 1–4 images |

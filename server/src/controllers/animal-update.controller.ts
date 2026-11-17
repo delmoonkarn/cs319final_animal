@@ -4,7 +4,7 @@ import { animalUpdateSelect, toAnimalUpdateItem, type AnimalUpdateItem } from ".
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
 import type { PublicUser } from "../lib/public-user";
-import { deleteImages } from "../lib/storage";
+import { deleteUnusedImages } from "../lib/image-cleanup";
 import { getAuthUser } from "../middlewares/auth";
 import type { Paginated } from "../types/api";
 import {
@@ -99,7 +99,7 @@ export async function editAnimalUpdate(req: Request, res: Response): Promise<voi
 
   if (data.imageUrls) {
     const kept = new Set(data.imageUrls);
-    await deleteImages(existing.imageUrls.filter((url) => !kept.has(url)));
+    await deleteUnusedImages(existing.imageUrls.filter((url) => !kept.has(url)));
   }
   res.json(toAnimalUpdateItem(update));
 }
@@ -111,6 +111,6 @@ export async function deleteAnimalUpdate(req: Request, res: Response): Promise<v
   const existing = await findEditableUpdate(id, user);
 
   await prisma.animalUpdate.delete({ where: { id } });
-  await deleteImages(existing.imageUrls);
+  await deleteUnusedImages(existing.imageUrls);
   res.status(204).end();
 }

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { AnimalStatus, ReviewStatus, type Prisma } from "@prisma/client";
 import type { Request, Response } from "express";
 import {
   animalDetailInclude,
@@ -7,9 +7,10 @@ import {
   toAnimalListItem,
   type AnimalListItem,
 } from "../lib/animal-dto";
+import { TRANSACTION_OPTIONS, lockAnimal, rejectPendingRequests } from "../lib/animal-status";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
-import { deleteImages } from "../lib/storage";
+import { deleteUnusedImages } from "../lib/image-cleanup";
 import type { Paginated } from "../types/api";
 import {
   createAnimalSchema,
@@ -34,14 +35,18 @@ export async function listAnimals(req: Request, res: Response): Promise<void> {
     species: query.species,
     status: query.status,
     gender: query.gender,
+    province: query.province,
     isUrgent: query.isUrgent,
     isVaccinated: query.isVaccinated,
+    isSterilized: query.isSterilized,
   };
   if (query.q) {
     where.OR = [
       { name: { contains: query.q, mode: "insensitive" } },
       { breed: { contains: query.q, mode: "insensitive" } },
+      { description: { contains: query.q, mode: "insensitive" } },
       { locationFound: { contains: query.q, mode: "insensitive" } },
+      { province: { contains: query.q, mode: "insensitive" } },
     ];
   }
 
@@ -78,32 +83,69 @@ export async function getAnimal(req: Request, res: Response): Promise<void> {
   res.json(toAnimalDetail(animal));
 }
 
-/** POST /api/animals (admin) — new listings start as AVAILABLE. */
+/**
+ * POST /api/animals (admin) — AVAILABLE by default; ADOPTED for an animal adopted offline.
+ * Adopted animals are never urgent (isUrgent is saved as false).
+ */
 export async function createAnimal(req: Request, res: Response): Promise<void> {
   const data = createAnimalSchema.parse(req.body);
-  const animal = await prisma.animal.create({ data, include: animalDetailInclude });
+  const adopted = data.status === AnimalStatus.ADOPTED;
+  const animal = await prisma.animal.create({
+    data: { ...data, isUrgent: adopted ? false : data.isUrgent, adoptedAt: adopted ? new Date() : null },
+    include: animalDetailInclude,
+  });
   res.status(201).json(toAnimalDetail(animal));
 }
 
-/** PATCH /api/animals/:id (admin) — partial update; photos removed from the list are deleted from Storage. */
+/**
+ * PATCH /api/animals/:id (admin) — partial update; photos removed from the list are deleted from Storage.
+ *
+ * status (admin override, e.g. for an adoption arranged offline):
+ *   ADOPTED   → adoptedAt = now, every request still waiting → REJECTED
+ *   AVAILABLE → back up for adoption (adoptedAt cleared); the approved request, if it was adopted
+ *               through the website, → REJECTED, so that person no longer counts as the adopter
+ * An animal that is (or becomes) ADOPTED is never urgent: isUrgent is saved as false.
+ */
 export async function updateAnimal(req: Request, res: Response): Promise<void> {
   const { id } = idParamSchema.parse(req.params);
-  const data = updateAnimalSchema.parse(req.body);
+  const { status, ...fields } = updateAnimalSchema.parse(req.body);
 
-  const existing = await prisma.animal.findUnique({
-    where: { id },
-    select: { imageUrls: true, report: { select: { imageUrls: true } } },
-  });
+  const existing = await prisma.animal.findUnique({ where: { id }, select: { imageUrls: true } });
   if (!existing) {
     throw new HttpError(404, "Animal not found");
   }
 
-  const animal = await prisma.animal.update({ where: { id }, data, include: animalDetailInclude });
+  const animal = await prisma.$transaction(async (tx) => {
+    // Same lock as adoption requests, so a status change can't race an approval.
+    await lockAnimal(tx, id);
+    const current = await tx.animal.findUniqueOrThrow({ where: { id }, select: { status: true } });
 
-  if (data.imageUrls) {
-    // Keep photos still listed, and photos the original report (if any) still shows.
-    const kept = new Set([...data.imageUrls, ...(existing.report?.imageUrls ?? [])]);
-    await deleteImages(existing.imageUrls.filter((url) => !kept.has(url)));
+    const data: Prisma.AnimalUpdateInput = { ...fields };
+    let newStatus = current.status;
+    if (status === AnimalStatus.ADOPTED && current.status !== AnimalStatus.ADOPTED) {
+      await rejectPendingRequests(tx, id);
+      newStatus = AnimalStatus.ADOPTED;
+      data.adoptedAt = new Date();
+    } else if (status === AnimalStatus.AVAILABLE && current.status === AnimalStatus.ADOPTED) {
+      await tx.adoptionRequest.updateMany({
+        where: { animalId: id, status: ReviewStatus.APPROVED },
+        data: { status: ReviewStatus.REJECTED },
+      });
+      newStatus = AnimalStatus.AVAILABLE;
+      data.adoptedAt = null;
+    }
+    data.status = newStatus;
+    if (newStatus === AnimalStatus.ADOPTED) {
+      data.isUrgent = false;
+    }
+
+    return tx.animal.update({ where: { id }, data, include: animalDetailInclude });
+  }, TRANSACTION_OPTIONS);
+
+  if (fields.imageUrls) {
+    // Photos the original report (or anything else) still shows are kept.
+    const kept = new Set(fields.imageUrls);
+    await deleteUnusedImages(existing.imageUrls.filter((url) => !kept.has(url)));
   }
 
   res.json(toAnimalDetail(animal));
@@ -118,11 +160,7 @@ export async function deleteAnimal(req: Request, res: Response): Promise<void> {
 
   const existing = await prisma.animal.findUnique({
     where: { id },
-    select: {
-      imageUrls: true,
-      updates: { select: { imageUrls: true } },
-      report: { select: { imageUrls: true } },
-    },
+    select: { imageUrls: true, updates: { select: { imageUrls: true } } },
   });
   if (!existing) {
     throw new HttpError(404, "Animal not found");
@@ -130,13 +168,8 @@ export async function deleteAnimal(req: Request, res: Response): Promise<void> {
 
   await prisma.animal.delete({ where: { id } });
 
-  // The original report is kept, so its photos (shared with the animal) stay too.
-  const keptForReport = new Set(existing.report?.imageUrls ?? []);
-  await deleteImages(
-    [...existing.imageUrls, ...existing.updates.flatMap((update) => update.imageUrls)].filter(
-      (url) => !keptForReport.has(url),
-    ),
-  );
+  // The original report is kept, so the photos it shares with the animal stay too.
+  await deleteUnusedImages([...existing.imageUrls, ...existing.updates.flatMap((update) => update.imageUrls)]);
 
   res.status(204).end();
 }

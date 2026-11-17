@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAcceptedImageUrl } from "../lib/storage";
 
 /** String field with "<Label> is required" / "<Label> must be text" messages instead of zod's defaults. */
 export function stringField(label: string) {
@@ -25,20 +26,27 @@ export function optionalTextField(label: string, max: number) {
     .optional();
 }
 
+const UPLOAD_URL_MESSAGE = "use the url returned by POST /api/uploads as it is (not thumbUrl)";
+
+/** An http(s) image link; links to our own Storage must be the exact upload `url`. */
+function imageUrl(label: string) {
+  return z
+    .url({ protocol: /^https?$/, error: `${label} must be a valid http(s) URL` })
+    .refine(isAcceptedImageUrl, { error: `${label}: ${UPLOAD_URL_MESSAGE}` });
+}
+
 /** A list of image URLs (from POST /api/uploads): min–max items, http(s), no duplicates. */
 export function imageUrlsField(min: number, max: number) {
   return z
-    .array(z.url({ protocol: /^https?$/, error: "Each image must be a valid http(s) URL" }), {
-      error: "imageUrls must be an array of image URLs",
-    })
+    .array(imageUrl("Each image"), { error: "imageUrls must be an array of image URLs" })
     .min(min, `Add at least ${min} image${min === 1 ? "" : "s"}`)
     .max(max, `Add at most ${max} images`)
     .refine((urls) => new Set(urls).size === urls.length, { error: "The same image is listed twice" });
 }
 
-/** A single http(s) URL, e.g. a payment slip uploaded through POST /api/uploads. */
+/** A single image URL, e.g. a payment slip uploaded through POST /api/uploads. */
 export function urlField(label: string) {
-  return z.url({ protocol: /^https?$/, error: `${label} must be a valid http(s) URL` });
+  return imageUrl(label);
 }
 
 /** Wraps a body schema so a missing/non-object body gives a clear message. */
