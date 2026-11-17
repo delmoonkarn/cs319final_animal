@@ -1,0 +1,312 @@
+# API test requests — open in VS Code with the "REST Client" extension (by Huachao Mao)
+# and click "Send Request" above any request.
+#
+# 1. Start the server first:  npm run dev
+# 2. Run the two login requests once — the other requests reuse their tokens automatically.
+# 3. Run "List AVAILABLE animals" once — requests marked {{availableId}} use the first animal in it.
+#    (Animal ids change after every `npm run db:seed`, so no ids are hard-coded here.)
+#
+# These requests use the database in your .env (your Supabase). Create / edit / delete change
+# real data; `npm run db:seed` resets everything to the sample data.
+
+@baseUrl = http://localhost:3000/api
+@adminToken = {{adminLogin.response.body.$.token}}
+@userToken = {{userLogin.response.body.$.token}}
+@availableId = {{availableAnimals.response.body.$.data[0].id}}
+
+### Health check
+GET {{baseUrl}}/health
+
+
+######################## Auth ########################
+
+### Login as admin (run this first)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@test.com", "password": "password123" }
+
+### Login as user1 (run this first)
+# @name userLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "user1@test.com", "password": "password123" }
+
+### Who am I (as user1)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{userToken}}
+
+### Register a new account (change the email each time, or you get 409)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{ "name": "ทดสอบ ระบบ", "email": "newuser1@test.com", "phone": "0812345678", "password": "secret123" }
+
+
+######################## Animals ########################
+
+### List (page 1, 12 per page, newest first)
+GET {{baseUrl}}/animals
+
+### List AVAILABLE animals — run this once; {{availableId}} below = the first one in this list
+# @name availableAnimals
+GET {{baseUrl}}/animals?status=AVAILABLE
+
+### Filters: urgent cats
+GET {{baseUrl}}/animals?species=CAT&isUrgent=true
+
+### Search (name, breed, location) + sort
+GET {{baseUrl}}/animals?q=บางกะปิ&sort=urgent
+
+### Page 2 with 5 per page
+GET {{baseUrl}}/animals?page=2&pageSize=5
+
+### Detail of {{availableId}} (or put any id from the list)
+GET {{baseUrl}}/animals/{{availableId}}
+
+### Create (admin) — RUN THIS FIRST (must return 201) before the edit/delete requests below.
+### imageUrls normally come from POST /uploads
+# @name createdAnimal
+POST {{baseUrl}}/animals
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "มะม่วง",
+  "species": "CAT",
+  "breed": "แมวไทยพันทาง",
+  "gender": "FEMALE",
+  "ageMonths": 7,
+  "personality": "ขี้เล่น ชอบไล่จับของเล่น",
+  "healthNote": "ทำหมันแล้ว",
+  "isVaccinated": true,
+  "imageUrls": ["https://picsum.photos/seed/mamuang/800/600"],
+  "locationFound": "ซอยอารีย์ เขตพญาไท"
+}
+
+### Edit the animal created above (admin)
+PATCH {{baseUrl}}/animals/{{createdAnimal.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "มะม่วง (แก้ไขแล้ว)", "isUrgent": true }
+
+### Delete the animal created above (admin)
+DELETE {{baseUrl}}/animals/{{createdAnimal.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+
+### Not allowed: user1 trying to create → 403
+POST {{baseUrl}}/animals
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "name": "x" }
+
+### Invalid data → 400 with a list of what's wrong
+POST {{baseUrl}}/animals
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "", "species": "FISH", "ageMonths": -1, "imageUrls": [] }
+
+
+######################## Adoption requests ########################
+
+### user1 applies for {{availableId}} — RUN THIS FIRST (must return 201) before cancel/approve/reject below.
+### If it returns 409 (already applied), re-run "List AVAILABLE animals" and send this again.
+# @name myRequest
+POST {{baseUrl}}/adoption-requests
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "animalId": {{availableId}}, "reason": "บ้านมีสนามกว้าง เคยเลี้ยงหมามาก่อน", "housingType": "HOUSE" }
+
+### user1's requests
+GET {{baseUrl}}/adoption-requests/me
+Authorization: Bearer {{userToken}}
+
+### user1 cancels the request above (only while PENDING) — needs "user1 applies" to have returned 201
+DELETE {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+
+### user1 cancels a request by id — get the id ("id" at the top, not animal.id) from "user1's requests"
+DELETE {{baseUrl}}/adoption-requests/16
+Authorization: Bearer {{userToken}}
+
+### Admin: all pending requests
+GET {{baseUrl}}/adoption-requests?status=PENDING
+Authorization: Bearer {{adminToken}}
+
+### Admin: approve the request above (animal → ADOPTED, other requests → REJECTED)
+PATCH {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "APPROVED" }
+
+### Admin: reject the request above instead
+PATCH {{baseUrl}}/adoption-requests/{{myRequest.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "REJECTED" }
+
+
+######################## Favorites ########################
+
+### user1's favorites
+GET {{baseUrl}}/favorites
+Authorization: Bearer {{userToken}}
+
+### Add {{availableId}} to favorites
+PUT {{baseUrl}}/favorites/{{availableId}}
+Authorization: Bearer {{userToken}}
+
+### Remove {{availableId}} from favorites
+DELETE {{baseUrl}}/favorites/{{availableId}}
+Authorization: Bearer {{userToken}}
+
+
+######################## Success stories ########################
+
+### Feed of all success stories (newest first)
+GET {{baseUrl}}/animal-updates
+
+### Find ข้าวตัง (adopted by user1) — run before posting a story as user1
+# @name adoptedByUser1
+GET {{baseUrl}}/animals?status=ADOPTED&q=ข้าวตัง
+
+### user1 posts a story about the animal they adopted
+# @name myStory
+POST {{baseUrl}}/animal-updates
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "animalId": {{adoptedByUser1.response.body.$.data[0].id}},
+  "caption": "วันนี้ข้าวตังไปเที่ยวสวนสาธารณะมา",
+  "imageUrls": ["https://picsum.photos/seed/story-test/800/600"]
+}
+
+### Edit that story (author or admin)
+PATCH {{baseUrl}}/animal-updates/{{myStory.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "caption": "แก้ไขข้อความแล้ว" }
+
+### Delete that story (author or admin)
+DELETE {{baseUrl}}/animal-updates/{{myStory.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+
+
+######################## Reports ########################
+
+### user1 reports a found animal — RUN THIS FIRST before approve/reject below
+# @name myReport
+POST {{baseUrl}}/reports
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "species": "DOG",
+  "breed": "ไทยพันทาง",
+  "imageUrls": ["https://picsum.photos/seed/report-test/800/600"],
+  "location": "หน้าตลาดนัด เขตจตุจักร",
+  "description": "พบหมาผอม ขาหลังเจ็บ นอนอยู่หน้าตลาด"
+}
+
+### user1's reports
+GET {{baseUrl}}/reports/me
+Authorization: Bearer {{userToken}}
+
+### Admin: pending reports
+GET {{baseUrl}}/reports?status=PENDING
+Authorization: Bearer {{adminToken}}
+
+### Admin: approve the report above → creates an animal listing from it
+PATCH {{baseUrl}}/reports/{{myReport.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "APPROVED",
+  "animal": {
+    "name": "ขาวมณี",
+    "gender": "MALE",
+    "ageMonths": 24,
+    "personality": "ขี้กลัวในช่วงแรก",
+    "healthNote": "ขาหลังเจ็บ รอพบสัตวแพทย์",
+    "isUrgent": true
+  }
+}
+
+### Admin: reject the report above instead (its photos are deleted)
+PATCH {{baseUrl}}/reports/{{myReport.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "REJECTED" }
+
+
+######################## Donations ########################
+
+### Donation packages (cheapest first) — run before donating
+# @name packages
+GET {{baseUrl}}/donation-packages
+
+### Public total for the homepage
+GET {{baseUrl}}/donations/summary
+
+### user1 donates (total is calculated by the server) — RUN THIS FIRST before confirm below
+# @name myDonation
+POST {{baseUrl}}/donations
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "packageId": {{packages.response.body.$[0].id}}, "quantity": 2 },
+    { "packageId": {{packages.response.body.$[1].id}}, "quantity": 1 }
+  ],
+  "slipUrl": "https://picsum.photos/seed/slip-test/600/900"
+}
+
+### user1's donations
+GET {{baseUrl}}/donations/me
+Authorization: Bearer {{userToken}}
+
+### Admin: pending donations
+GET {{baseUrl}}/donations?status=PENDING
+Authorization: Bearer {{adminToken}}
+
+### Admin: confirm the donation above
+PATCH {{baseUrl}}/donations/{{myDonation.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "CONFIRMED" }
+
+### Admin: add a package
+POST {{baseUrl}}/donation-packages
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "ปลอกคอและสายจูง", "description": "ปลอกคอพร้อมป้ายชื่อและสายจูง 1 ชุด", "price": 250, "icon": "🦮" }
+
+
+######################## Uploads ########################
+
+### Upload an image (admin) — put a real image next to this file and set its name below
+POST {{baseUrl}}/uploads
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=FormBoundary
+
+--FormBoundary
+Content-Disposition: form-data; name="images"; filename="cat.jpg"
+Content-Type: image/jpeg
+
+< ./cat.jpg
+--FormBoundary--

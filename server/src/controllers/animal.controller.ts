@@ -90,7 +90,10 @@ export async function updateAnimal(req: Request, res: Response): Promise<void> {
   const { id } = idParamSchema.parse(req.params);
   const data = updateAnimalSchema.parse(req.body);
 
-  const existing = await prisma.animal.findUnique({ where: { id }, select: { imageUrls: true } });
+  const existing = await prisma.animal.findUnique({
+    where: { id },
+    select: { imageUrls: true, report: { select: { imageUrls: true } } },
+  });
   if (!existing) {
     throw new HttpError(404, "Animal not found");
   }
@@ -98,7 +101,8 @@ export async function updateAnimal(req: Request, res: Response): Promise<void> {
   const animal = await prisma.animal.update({ where: { id }, data, include: animalDetailInclude });
 
   if (data.imageUrls) {
-    const kept = new Set(data.imageUrls);
+    // Keep photos still listed, and photos the original report (if any) still shows.
+    const kept = new Set([...data.imageUrls, ...(existing.report?.imageUrls ?? [])]);
     await deleteImages(existing.imageUrls.filter((url) => !kept.has(url)));
   }
 
@@ -114,14 +118,25 @@ export async function deleteAnimal(req: Request, res: Response): Promise<void> {
 
   const existing = await prisma.animal.findUnique({
     where: { id },
-    select: { imageUrls: true, updates: { select: { imageUrls: true } } },
+    select: {
+      imageUrls: true,
+      updates: { select: { imageUrls: true } },
+      report: { select: { imageUrls: true } },
+    },
   });
   if (!existing) {
     throw new HttpError(404, "Animal not found");
   }
 
   await prisma.animal.delete({ where: { id } });
-  await deleteImages([...existing.imageUrls, ...existing.updates.flatMap((update) => update.imageUrls)]);
+
+  // The original report is kept, so its photos (shared with the animal) stay too.
+  const keptForReport = new Set(existing.report?.imageUrls ?? []);
+  await deleteImages(
+    [...existing.imageUrls, ...existing.updates.flatMap((update) => update.imageUrls)].filter(
+      (url) => !keptForReport.has(url),
+    ),
+  );
 
   res.status(204).end();
 }

@@ -94,10 +94,15 @@ All seeded accounts use the password **`password123`**.
 | USER | `user4@test.com` | นภัสสร พงษ์ไทย |
 | USER | `user5@test.com` | ธนพล แก้วมณี |
 
-The seed also creates 42 animals (7 adopted, 5 pending, 30 available; 7 urgent), 15 adoption requests,
-15 favorites, 20 success-story updates, 8 community reports, 6 donation packages and 5 donations with
-9 items (126 records in total). Seed images are external placeholders (picsum.photos), not files in Storage.
-Database ids are not reset between seeds, so log in again after re-seeding.
+The seed also creates 40 animals (7 adopted, 5 pending, 28 available; 7 urgent), 15 adoption requests,
+21 favorites, 20 success-story updates, 8 community reports, 6 donation packages and 5 donations with
+9 items (130 records in total; the seed refuses to run with fewer than 40).
+
+Animal photos are the `imageUrls` links in `server/prisma/seed-data.ts` (1–5 per animal, first = cover):
+free-licensed photos from Wikimedia Commons, credited in `server/prisma/photo-credits.md`. To check
+them, run `npm run photos:preview` and open the generated `server/seed-photos.html` in a browser.
+Success-story, report and slip images in the seed are still random placeholders (picsum.photos).
+Database ids are not reset between seeds, so log in again after re-seeding (animal ids change too).
 
 ## API
 
@@ -212,6 +217,154 @@ Example: `GET /animals?species=CAT&isUrgent=true&q=บางนา&page=1&pageSi
   photos. A report it was created from is kept (unlinked).
 - Animal responses already include `thumbUrl` for every image.
 - Response types: `server/src/lib/animal-dto.ts` and `server/src/types/api.ts`.
+
+### Adoption requests
+
+| Method | Path | Auth | Body / query | Response |
+| --- | --- | --- | --- | --- |
+| POST | `/adoption-requests` | user | `{ animalId, reason, housingType }` | `201 MyAdoptionRequest` |
+| GET | `/adoption-requests/me` | user | `?status=` (optional) | `200 MyAdoptionRequest[]` (newest first) |
+| DELETE | `/adoption-requests/:id` | user (own, PENDING only) | – | `204` |
+| GET | `/adoption-requests` | admin | `?status=&animalId=&page=&pageSize=` | `200 { data: AdminAdoptionRequest[], pagination }` |
+| PATCH | `/adoption-requests/:id` | admin | `{ "status": "APPROVED" }` or `"REJECTED"` | `200 AdminAdoptionRequest` |
+
+```jsonc
+// MyAdoptionRequest
+{ "id": 16, "reason": "…", "housingType": "CONDO", "status": "PENDING", "createdAt": "…",
+  "animal": { /* AnimalListItem, with its current status */ } }
+
+// AdminAdoptionRequest = MyAdoptionRequest + the applicant's contact details
+{ …, "user": { "id": 2, "name": "สมชาย ใจดี", "email": "user1@test.com", "phone": "0811111111" } }
+```
+
+How the animal's status follows the requests (all handled by the server):
+
+| Event | Request | Animal |
+| --- | --- | --- |
+| First request on an `AVAILABLE` animal | `PENDING` | → `PENDING` |
+| Admin approves | → `APPROVED` | → `ADOPTED` (+ `adoptedAt`); every other pending request for it → `REJECTED` |
+| Admin rejects, or the user cancels, and no pending request is left | → `REJECTED` / deleted | → `AVAILABLE` |
+
+- `housingType`: `HOUSE` / `CONDO` / `DORM`. Only `USER` accounts can apply (admins get 403).
+- 409 errors: the animal is already adopted, the user already applied for it (one request per user
+  per animal, even after a rejection), or the request was already approved/rejected.
+- Changes for the same animal run one at a time (database transaction + row lock), so an animal can
+  never be approved for two people.
+- Response types: `server/src/lib/adoption-request-dto.ts`.
+
+### Favorites (wishlist)
+
+| Method | Path | Auth | Response |
+| --- | --- | --- | --- |
+| GET | `/favorites` | user | `200 FavoriteDto[]` (most recently added first) |
+| PUT | `/favorites/:animalId` | user | `204` — add (adding twice is fine) |
+| DELETE | `/favorites/:animalId` | user | `204` — remove (fine if it wasn't there) |
+
+```jsonc
+// FavoriteDto
+{ "animalId": 7, "createdAt": "…", "animal": { /* AnimalListItem */ } }
+```
+
+For heart icons: load `GET /favorites` once and check `animalId`s. Toggling never errors, so the
+button can just call PUT or DELETE. `AnimalDetail.favoriteCount` shows how many users saved it.
+Response type: `server/src/lib/favorite-dto.ts`.
+
+### Success stories (animal updates)
+
+| Method | Path | Auth | Body / query | Response |
+| --- | --- | --- | --- | --- |
+| GET | `/animal-updates` | – | `?animalId=&page=&pageSize=` | `200 { data: AnimalUpdateItem[], pagination }` (newest first) |
+| POST | `/animal-updates` | admin or the animal's adopter | `{ animalId, caption, imageUrls }` | `201 AnimalUpdateItem` |
+| PATCH | `/animal-updates/:id` | author or admin | `{ caption?, imageUrls? }` | `200 AnimalUpdateItem` |
+| DELETE | `/animal-updates/:id` | author or admin | – | `204` |
+
+```jsonc
+// AnimalUpdateItem
+{ "id": 18, "caption": "…", "createdAt": "…", "images": [{ "url": "…", "thumbUrl": "…" }],
+  "author": { "id": 2, "name": "สมชาย ใจดี", "role": "USER" },
+  "animal": { /* AnimalListItem */ } }
+```
+
+- Only for `ADOPTED` animals (409 otherwise). The adopter = the user whose request was approved.
+- `imageUrls`: 1–4. Photos removed by PATCH, and all photos on DELETE, are deleted from Storage.
+- `AnimalDetail.updates` also lists an animal's stories (oldest first) for its timeline.
+
+### Reports (found / injured animals)
+
+| Method | Path | Auth | Body / query | Response |
+| --- | --- | --- | --- | --- |
+| POST | `/reports` | user | `{ species, breed?, imageUrls, location, description }` | `201 MyReport` |
+| GET | `/reports/me` | user | – | `200 MyReport[]` (newest first) |
+| GET | `/reports/:id` | reporter or admin | – | `200 MyReport` / `AdminReport` |
+| DELETE | `/reports/:id` | reporter (PENDING only) or admin | – | `204` |
+| GET | `/reports` | admin | `?status=&species=&page=&pageSize=` | `200 { data: AdminReport[], pagination }` |
+| PATCH | `/reports/:id` | admin | see below | `200 AdminReport` |
+
+```jsonc
+// MyReport
+{ "id": 9, "species": "DOG", "breed": null, "location": "…", "description": "…", "status": "PENDING",
+  "createdAt": "…", "images": [{ "url": "…", "thumbUrl": "…" }],
+  "animal": null }            // { id, name, status } once approved
+// AdminReport = MyReport + "reporter": { id, name, email, phone }
+```
+
+Reviewing (admin):
+
+```jsonc
+{ "status": "REJECTED" }      // photos are deleted from Storage, images become []
+
+{ "status": "APPROVED",       // creates an AVAILABLE animal from the report and links it
+  "animal": { "name": "แม่ส้ม", "gender": "FEMALE", "ageMonths": 24,
+              "personality": "…", "healthNote": "…",
+              // optional — taken from the report when left out:
+              "breed": "…", "locationFound": "…", "imageUrls": ["…"],
+              "isVaccinated": false, "isUrgent": true } }
+```
+
+- `imageUrls`: 1–3. `breed` is optional when reporting; it's required when approving if the report has none.
+- The new animal's species, photos and location come from the report. Those photos stay shared:
+  editing or deleting the animal never deletes photos the report still shows.
+- 409: the report was already reviewed (only one admin can approve it).
+
+### Donations
+
+**Packages**
+
+| Method | Path | Auth | Body | Response |
+| --- | --- | --- | --- | --- |
+| GET | `/donation-packages` | – | – | `200 DonationPackage[]` (cheapest first) |
+| POST | `/donation-packages` | admin | `{ name, description, price, icon }` | `201 DonationPackage` |
+| PATCH | `/donation-packages/:id` | admin | any of those fields | `200 DonationPackage` |
+| DELETE | `/donation-packages/:id` | admin | – | `204` (409 if already used in donations) |
+
+`DonationPackage` = `{ id, name, description, price, icon }` — `price` in THB (whole baht), `icon` e.g. `"🍖"`.
+
+**Donations**
+
+| Method | Path | Auth | Body / query | Response |
+| --- | --- | --- | --- | --- |
+| GET | `/donations/summary` | – | – | `200 { totalConfirmed, confirmedCount }` |
+| POST | `/donations` | user | `{ items: [{ packageId, quantity }], slipUrl }` | `201 MyDonation` |
+| GET | `/donations/me` | user | – | `200 MyDonation[]` (newest first) |
+| DELETE | `/donations/:id` | donor (PENDING only) or admin | – | `204` |
+| GET | `/donations` | admin | `?status=&page=&pageSize=` | `200 { data: AdminDonation[], pagination }` |
+| PATCH | `/donations/:id` | admin | `{ "status": "CONFIRMED" }` (or `"PENDING"`) | `200 AdminDonation` |
+
+```jsonc
+// MyDonation (the receipt)
+{ "id": 6, "total": 500, "status": "PENDING", "createdAt": "…",
+  "slip": { "url": "…", "thumbUrl": "…" },
+  "items": [ { "id": 10, "quantity": 2, "unitPrice": 100, "subtotal": 200,
+               "package": { "id": 1, "name": "ค่าอาหาร 1 สัปดาห์", "icon": "🍖" } } ] }
+// AdminDonation = MyDonation + "user": { id, name, email, phone }
+```
+
+- Flow: upload the slip photo (`POST /uploads`) → `POST /donations` with its `url` as `slipUrl`.
+- The server takes each `unitPrice` from the package and calculates `total` itself; prices sent by the
+  client are ignored. Later package price changes don't change past donations.
+- `quantity`: 1–99; each package at most once per donation. New donations are `PENDING` until an
+  admin confirms the slip. Deleting a donation also deletes its slip photo.
+- Slips are in the public bucket: anyone with the exact (random) link can open them.
 
 ### Health
 

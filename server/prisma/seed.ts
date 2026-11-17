@@ -26,6 +26,14 @@ function placeholderImages(prefix: string, count: number, width = 800, height = 
   return Array.from({ length: count }, (_, i) => `https://picsum.photos/seed/${prefix}-${i + 1}/${width}/${height}`);
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 function lookup<V>(map: ReadonlyMap<string, V>, key: string, what: string): V {
   const value = map.get(key);
   if (value === undefined) {
@@ -50,14 +58,22 @@ function validateSeedData(): void {
   check(userByEmail.size === users.length, "user emails must be unique");
   check(animalByKey.size === animals.length, "animal keys must be unique");
   check(new Set(animals.map((a) => a.name)).size === animals.length, "animal names must be unique");
-  check(animals.length >= 40, "there must be at least 40 animals");
+
+  // The assignment requires at least 40 seeded records in total.
+  const totalRecords =
+    users.length + animals.length + adoptionRequests.length + favorites.length + animalUpdates.length +
+    reports.length + donationPackages.length + donations.length +
+    donations.reduce((sum, d) => sum + d.items.length, 0);
+  check(totalRecords >= 40, `the seed must create at least 40 records (currently ${totalRecords})`);
 
   // Animals ↔ adoption requests ↔ updates
   for (const animal of animals) {
     const requests = adoptionRequests.filter((r) => r.animal === animal.key);
     const countWith = (status: ReviewStatus) => requests.filter((r) => r.status === status).length;
 
-    check(animal.images >= 1 && animal.images <= 5, `${animal.key}: needs 1-5 images`);
+    check(animal.imageUrls.length >= 1 && animal.imageUrls.length <= 5, `${animal.key}: needs 1-5 imageUrls`);
+    check(new Set(animal.imageUrls).size === animal.imageUrls.length, `${animal.key}: the same image is listed twice`);
+    check(animal.imageUrls.every(isHttpUrl), `${animal.key}: every image must be an http(s) link`);
 
     if (animal.status === "ADOPTED") {
       const approved = requests.find((r) => r.status === "APPROVED");
@@ -197,7 +213,7 @@ async function main(): Promise<void> {
     healthNote: a.healthNote,
     isVaccinated: a.isVaccinated,
     isUrgent: a.isUrgent,
-    imageUrls: placeholderImages(`animal-${a.key}`, a.images),
+    imageUrls: a.imageUrls,
     locationFound: a.locationFound,
     status: a.status,
     adoptedAt: a.adoptedDaysAgo === undefined ? null : daysAgo(a.adoptedDaysAgo),

@@ -9,6 +9,9 @@ node_modules/
 # Build output
 dist/
 
+# Generated photo check page (npm run photos:preview)
+seed-photos.html
+
 # Logs
 *.log
 npm-debug.log*
