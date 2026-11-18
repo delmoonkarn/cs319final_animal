@@ -1,28 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import {
   PawPrint, User, Mail, Lock, Phone, UserPlus, LogIn, AlertCircle, Loader2,
 } from 'lucide-react';
 import { api } from '../api';
-import { useAuthStore, type AuthUser, type UserRole } from '../store/useAuthStore';
+import { useAuthStore, type AuthUser } from '../store/useAuthStore';
+import { errorMessage } from '../lib/admin-api';
 
-
-const SEED_USERS: { email: string; name: string; phone: string; role: UserRole }[] = [
-  { name: 'ผู้ดูแลระบบ', email: 'admin@test.com', phone: '0800000000', role: 'ADMIN' },
-  { name: 'สมชาย ใจดี', email: 'user1@test.com', phone: '0811111111', role: 'USER' },
-  { name: 'สุดารัตน์ รักสัตว์', email: 'user2@test.com', phone: '0822222222', role: 'USER' },
-  { name: 'วิทยา ศรีสุข', email: 'user3@test.com', phone: '0833333333', role: 'USER' },
-  { name: 'นภัสสร พงษ์ไทย', email: 'user4@test.com', phone: '0844444444', role: 'USER' },
-  { name: 'ธนพล แก้วมณี', email: 'user5@test.com', phone: '0855555555', role: 'USER' },
-];
-
-function detectRoleByEmail(email: string): UserRole {
-  const matched = SEED_USERS.find((u) => u.email === email);
-  if (matched) return matched.role;
-
-  if (email.startsWith('admin@')) return 'ADMIN';
-  return 'USER';
-}
+/** POST /auth/login and POST /auth/register */
+type AuthResponse = { user: AuthUser; token: string };
 
 export function AuthPage() {
   const navigate = useNavigate();
@@ -57,68 +44,41 @@ export function AuthPage() {
 
       setLoading(true);
       try {
-        const res = await api.post('/auth/register', {
+        const { data } = await api.post<AuthResponse>('/auth/register', {
           name: name.trim(),
           email: cleanEmail,
           phone: cleanPhone,
           password,
         });
-        const user: AuthUser = res.data.user;
-        const token: string = res.data.token;
-        setAuth(user, token);
+        setAuth(data.user, data.token);
         navigate('/profile');
-        return;
-      } catch (err: any) {
-        const status = err?.response?.status;
-        if (status === 409) {
-          setLoading(false);
-          return setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ');
+      } catch (err) {
+        // No offline fallback: without a token from the server the account can't do anything.
+        if (isAxiosError(err) && err.response?.status === 409) {
+          setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ');
+        } else {
+          setError(errorMessage(err, 'สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'));
         }
-        if (err?.response?.data?.message) {
-          setLoading(false);
-          return setError(err.response.data.message);
-        }
-        const offlineUser: AuthUser = {
-          id: Date.now(),
-          name: name.trim(),
-          email: cleanEmail,
-          phone: cleanPhone,
-          role: 'USER',
-        };
-        setAuth(offlineUser, '');
+      } finally {
         setLoading(false);
-        navigate('/profile');
-        return;
       }
+      return;
     }
 
     setLoading(true);
     try {
-      const res = await api.post('/auth/login', { email: cleanEmail, password });
-      const user: AuthUser = res.data.user;
-      const token: string = res.data.token;
-
-      setAuth(user, token);
-      navigate(user.role === 'ADMIN' ? '/admin' : '/profile');
-    } catch (err: any) {
-      const status = err?.response?.status;
+      const { data } = await api.post<AuthResponse>('/auth/login', { email: cleanEmail, password });
+      setAuth(data.user, data.token);
+      navigate(data.user.role === 'ADMIN' ? '/admin' : '/profile');
+    } catch (err) {
+      const status = isAxiosError(err) ? err.response?.status : undefined;
       if (status === 401 || status === 400) {
-        setLoading(false);
-        return setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      } else {
+        setError(errorMessage(err, 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'));
       }
-
-      const matchedSeed = SEED_USERS.find((u) => u.email === cleanEmail);
-      const role = detectRoleByEmail(cleanEmail);
-      const fallbackUser: AuthUser = {
-        id: matchedSeed ? (role === 'ADMIN' ? 1 : 2) : Date.now(),
-        name: matchedSeed?.name || (role === 'ADMIN' ? 'ผู้ดูแลระบบ' : cleanEmail.split('@')[0]),
-        email: cleanEmail,
-        phone: matchedSeed?.phone || '0812345678',
-        role,
-      };
-      setAuth(fallbackUser, '');
+    } finally {
       setLoading(false);
-      navigate(role === 'ADMIN' ? '/admin' : '/profile');
     }
   };
 

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useFavoriteStore } from './useFavoriteStore';
 
 export type UserRole = 'USER' | 'ADMIN';
 
@@ -25,10 +24,24 @@ if (typeof window !== 'undefined') {
   }
 }
 
+function readInitialToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** A saved user without a token (left by an old offline login) counts as logged out. */
 function readInitialUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    if (!readInitialToken()) {
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
+    return JSON.parse(raw);
   } catch {
     return null;
   }
@@ -48,7 +61,7 @@ interface AuthStore {
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: readInitialUser(),
-  token: typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null,
+  token: typeof window !== 'undefined' ? readInitialToken() : null,
   setAuth: (user, token) => {
     try {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -57,7 +70,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
     }
     set({ user, token });
-    useFavoriteStore.getState().syncForCurrentUser();
   },
   logout: () => {
     try {
@@ -67,6 +79,5 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
     }
     set({ user: null, token: null });
-    useFavoriteStore.getState().syncForCurrentUser();
   },
 }));

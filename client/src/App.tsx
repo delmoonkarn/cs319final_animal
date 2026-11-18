@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { ReportPage } from './pages/ReportPage';
@@ -9,18 +8,7 @@ import { AuthPage } from './pages/AuthPage';
 import { AdminPage } from './pages/AdminPage';
 import { PawPrint, User, ShieldCheck, LogOut, LogIn } from 'lucide-react';
 import { useAuthStore } from './store/useAuthStore';
-import { loadAllStoredRequests } from './components/AdoptionModal';
-import { loadAllSavedReports } from './pages/ReportPage';
-
-function countPendingForAdmin(): number {
-  try {
-    const reqs = loadAllStoredRequests().filter((r) => r.status === 'PENDING').length;
-    const reps = loadAllSavedReports().filter((r) => (r.status || 'PENDING') === 'PENDING').length;
-    return reqs + reps;
-  } catch {
-    return 0;
-  }
-}
+import { useAdminStats } from './lib/admin-api';
 
 
 function Navbar() {
@@ -30,11 +18,11 @@ function Navbar() {
 
   const isAdminAccount = user?.role === 'ADMIN';
   const isAdminView = location.pathname.startsWith('/admin');
-  const [pendingTotal, setPendingTotal] = useState(() => countPendingForAdmin());
-
-  useEffect(() => {
-    setPendingTotal(countPendingForAdmin());
-  }, [location.pathname]);
+  // Waiting requests + reports + donation slips, from the server (same cache as the admin page).
+  const { data: adminStats } = useAdminStats(isAdminAccount);
+  const pendingTotal = adminStats
+    ? adminStats.pendingRequests + adminStats.pendingReports + adminStats.pendingDonations
+    : 0;
 
   const handleLogout = () => {
     logout();

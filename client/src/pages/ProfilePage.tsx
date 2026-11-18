@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
-import { useFavoriteStore } from '../store/useFavoriteStore';
+import { useFavorites } from '../lib/favorites';
 import { useAuthStore } from '../store/useAuthStore';
 import { mergeAnimalsWithAdminChanges } from '../lib/local-animals';
 import { PetCard } from './HomePage';
@@ -49,7 +49,6 @@ export function ProfilePage() {
   const [requests, setRequests] = useState<StoredAdoptionRequest[]>(() => loadStoredRequests());
 
   useEffect(() => {
-    useFavoriteStore.getState().syncForCurrentUser();
     setRequests(loadStoredRequests());
   }, [activeTab, user?.email]);
 
@@ -69,8 +68,9 @@ export function ProfilePage() {
   };
 
 
-  const { favorites = [], toggleFavorite } = useFavoriteStore();
-  const { data: animals = [], isLoading } = useQuery({
+  // Favorites come from the database (with the animal data), so every favorite shows here.
+  const { favoriteAnimals: favoritedAnimals, toggleFavorite, isLoading } = useFavorites();
+  const { data: animals = [] } = useQuery({
     queryKey: ['animals_profile'],
     queryFn: async () => {
       try {
@@ -87,11 +87,6 @@ export function ProfilePage() {
 
 
   const allAnimals = mergeAnimalsWithAdminChanges(animals);
-  const favoritedAnimals = allAnimals.filter((pet: any) => {
-    if (!pet) return false;
-    const petId = pet.id ? String(pet.id) : String(pet.key);
-    return favorites.includes(petId);
-  });
 
   const findPetForRequest = (petId: string) =>
     allAnimals.find((a: any) => String(a?.id) === String(petId) || String(a?.key) === String(petId));

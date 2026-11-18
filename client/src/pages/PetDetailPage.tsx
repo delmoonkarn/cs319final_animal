@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { AdoptionModal, loadAllStoredRequests } from '../components/AdoptionModal';
 import { findLocalOrOverrideAnimal } from '../lib/local-animals';
-import { useFavoriteStore } from '../store/useFavoriteStore';
+import { useFavorites } from '../lib/favorites';
+import { SuccessStories } from '../components/SuccessStories';
 import {
     ArrowLeft, MapPin, Heart, AlertTriangle,
     Share2, Activity, ShieldCheck, Bone, Users
@@ -13,7 +14,7 @@ import {
 export function PetDetailPage() {
     const { id } = useParams();
     const [showAdoptForm, setShowAdoptForm] = useState(false);
-    const { favorites = [], toggleFavorite } = useFavoriteStore();
+    const { favorites, toggleFavorite } = useFavorites();
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -60,13 +61,6 @@ export function PetDetailPage() {
     const formatDate = (value?: string) =>
         value ? new Date(value).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
-    const petPhotos: string[] = Array.from(
-        new Set([
-            ...(Array.isArray(pet.images) ? pet.images.map((img: any) => img?.url).filter(Boolean) : []),
-            ...(Array.isArray(pet.imageUrls) ? pet.imageUrls.filter(Boolean) : []),
-            ...(pet?.coverImage?.url ? [pet.coverImage.url] : []),
-        ]),
-    );
 
     const handleShare = () => {
         navigator.clipboard.writeText(window.location.href);
@@ -212,26 +206,8 @@ export function PetDetailPage() {
 
                 <div className="mt-12">
                     {isAdopted ? (
-                        <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                            <h2 className="text-xl font-extrabold text-[#3D312E] mb-6 flex items-center gap-2">
-                                <Heart size={24} className="text-pink-500 fill-pink-500" /> กระดานความสุขหลังได้บ้าน
-                            </h2>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {petPhotos.map((photoUrl, idx) => (
-                                    <div key={idx} className="h-40 rounded-2xl overflow-hidden bg-gray-100">
-                                        <img
-                                            src={photoUrl}
-                                            alt={`${pet.name} รูปที่ ${idx + 1}`}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                ))}
-                                <div className="h-40 rounded-2xl overflow-hidden bg-gray-50 flex flex-col items-center justify-center text-gray-400 text-sm font-bold border-2 border-dashed border-gray-200">
-                                    รออัปเดตเพิ่มเติม...
-                                </div>
-                            </div>
-                        </div>
+                        // Real success-story updates from the database; the owner (or an admin) can post.
+                        <SuccessStories animalId={Number(pet.id)} animalName={pet.name} updates={Array.isArray(pet.updates) ? pet.updates : []} />
                     ) : (
 
                         <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm">

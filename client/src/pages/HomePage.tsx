@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
-import { useFavoriteStore } from '../store/useFavoriteStore';
+import { useFavorites } from '../lib/favorites';
 import { mergeAnimalsWithAdminChanges } from '../lib/local-animals';
 import { Link } from 'react-router-dom';
 import {
@@ -117,7 +117,7 @@ export function HomePage() {
   const [filterProvince, setFilterProvince] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'AVAILABLE' | 'URGENT' | 'ADOPTED'>('ALL');
 
-  const { favorites = [], toggleFavorite } = useFavoriteStore();
+  const { favorites, toggleFavorite } = useFavorites();
 
   const handleStatusClick = (status: 'AVAILABLE' | 'URGENT' | 'ADOPTED') => {
     setFilterStatus((prev) => (prev === status ? 'ALL' : status));
