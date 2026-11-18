@@ -5,7 +5,20 @@ import { ReportPage } from './pages/ReportPage';
 import { DonationPage } from './pages/DonationPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PetDetailPage } from './pages/PetDetailPage';
-import { PawPrint, User, ShieldCheck } from 'lucide-react';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { NavAuth } from './components/NavAuth';
+import { RequireAuth } from './components/RequireAuth';
+import { useRefreshUser } from './lib/use-refresh-user';
+import { AdminLayout } from './admin/AdminLayout';
+import { AnimalsPage } from './admin/AnimalsPage';
+import { AnimalFormPage } from './admin/AnimalFormPage';
+import { ReportsPage } from './admin/ReportsPage';
+import { ReportApprovePage } from './admin/ReportApprovePage';
+import { ReportDetailPage } from './admin/ReportDetailPage';
+import { AdoptionsPage } from './admin/AdoptionsPage';
+import { AdoptionDetailPage } from './admin/AdoptionDetailPage';
+import { PawPrint } from 'lucide-react';
 
 // สร้าง Component Navbar แยกไว้ เพื่อให้แสดงทุกหน้า
 function Navbar() {
@@ -45,9 +58,8 @@ function Navbar() {
         </Link>
       </div>
 
-      <div className="flex gap-3 text-xs font-bold text-gray-600 w-48 justify-end">
-        <button className="flex items-center gap-1.5 border border-gray-200 hover:border-orange-500 rounded-full px-4 py-1.5 transition"><User size={14} /> User</button>
-        <button className="flex items-center gap-1.5 border border-gray-200 hover:border-orange-500 rounded-full px-4 py-1.5 transition"><ShieldCheck size={14} /> Admin</button>
+      <div className="flex gap-2 text-xs font-bold text-gray-600 w-48 justify-end">
+        <NavAuth />
       </div>
     </nav>
   );
@@ -55,6 +67,8 @@ function Navbar() {
 
 // Component หลักที่เป็นตัวจัดการเส้นทาง (Router)
 export default function App() {
+  useRefreshUser(); // re-check the saved login when the page loads
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-[#FAFAFA] font-sans">
@@ -64,8 +78,28 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/report" element={<ReportPage />} />
           <Route path="/donation" element={<DonationPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/pet/:id" element={<PetDetailPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* Logged-in users only (others are sent to /login and brought back) */}
+          <Route element={<RequireAuth />}>
+            <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+
+          {/* Admin pages (admin accounts only) */}
+          <Route element={<RequireAuth role="ADMIN" />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AnimalsPage />} />
+              <Route path="animals/new" element={<AnimalFormPage />} />
+              <Route path="animals/:id/edit" element={<AnimalFormPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="reports/:id" element={<ReportDetailPage />} />
+              <Route path="reports/:id/approve" element={<ReportApprovePage />} />
+              <Route path="adoptions" element={<AdoptionsPage />} />
+              <Route path="adoptions/:id" element={<AdoptionDetailPage />} />
+            </Route>
+          </Route>
         </Routes>
       </div>
     </BrowserRouter>
